@@ -13,8 +13,9 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
   - `backend/.env` created: Atlas URI (cluster0.1kjtoqy, db `url-shortener`), generated JWT_SECRET + VISITOR_HASH_SALT. Atlas connection ✅ verified. Google Client ID ✅ set in `.env` and both frontend environment files (public value, safe to commit).
   - Local run ✅ confirmed working by user (2026-11-21).
   - Atlas Network Access opened for Render (done by user 2026-11-21).
-  - Initial commit made (author Vansh Talwar, no Claude co-author — user rule). Remote: https://github.com/vanshtalwar/Url-Shortener.git. Push pending: user installing `gh` + `gh auth login`.
-  - Then: Render → set `apiUrl` in environment.prod.ts → Vercel → FRONTEND_ORIGIN + Google origin (README §4).
+  - Initial commit made (author Vansh Talwar, no Claude co-author — user rule). Remote: https://github.com/vanshtalwar/Url-Shortener.git. Pushed ✅ (`c6fff9c`, private repo, `main` tracks `origin/main`; gh logged in as vanshtalwar).
+  - Render backend ✅ live: https://url-shortener-z283.onrender.com (manual Web Service, root `backend`; /health 200, DB reachable). `apiUrl` set in environment.prod.ts.
+  - Next: Vercel (root `frontend`) → set Render `FRONTEND_ORIGIN` to Vercel URL → add Vercel URL to Google Authorized JavaScript origins → live check.
 
 ## Backend layout (`backend/`)
 - `src/config.ts` — env vars (`PORT`, `FRONTEND_ORIGIN`, `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `VISITOR_HASH_SALT`); `.env` loaded via dotenv.
@@ -96,3 +97,5 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
 - 2026-11-21 — Google Client ID: removed stray `<` in `.env`, set in `environment.ts` + `environment.prod.ts`. Verified: Google recognises the client (fake ID → invalid_client); backend rejects forged token 401 with real config; ng build clean. Browser sign-in not yet tested (needs `http://localhost:4200` in Authorized JavaScript origins).
 - 2026-11-21 — User confirmed the app works locally (Google sign-in + Atlas).
 - 2026-11-21 — Initial commit on `main` (repo-local git identity set), remote `origin` added. User opened Atlas network access. Push waiting on GitHub auth.
+- 2026-11-21 — Pushed `main` to GitHub (private). Verified: remote HEAD = local `c6fff9c`, author Vansh Talwar, no co-author/Claude text, 72 files, no `.env`/node_modules/dist.
+- 2026-11-21 — Backend deployed on Render (user, manual Web Service form instead of Blueprint). Verified live: /health 200, /api/links 401, unknown code 404. Set production `apiUrl`; prod bundle checked (Render URL, no localhost).
