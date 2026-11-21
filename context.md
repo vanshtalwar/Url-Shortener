@@ -49,7 +49,7 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
 - Links table shows the alias/code as the link text (full short URL on copy/QR); one row editable at a time.
 - Stats response now includes the `link` object (so the detail page needs one request, not the whole list).
 - Angular initial bundle warning budget raised 500kb → 700kb (chart.js; ~144 kB gzipped). Alternative would be lazy-loading the detail page.
-- Unused Angular test scaffolding left as generated (`karma.conf.js`, `tsconfig.spec.json`, Karma devDependencies) — remove if you don't plan frontend unit tests.
+- Angular test scaffolding removed (user request): no frontend unit-test setup. `karma` still appears in package-lock.json only as a peer/dependency of `@angular-devkit/build-angular` (dev-only, not in the bundle).
 
 ## Frontend layout (`frontend/`, Angular 14, Node 16 via `.nvmrc`)
 - `src/environments/` — `apiUrl`, `googleClientId` (placeholders until user provides values).
@@ -102,3 +102,4 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
 - 2026-11-21 — Backend deployed on Render (user, manual Web Service form instead of Blueprint). Verified live: /health 200, /api/links 401, unknown code 404. Set production `apiUrl`; prod bundle checked (Render URL, no localhost).
 - 2026-11-21 — Frontend deployed on Vercel. Verified: / and /links 200, bundle points at Render. Render CORS still `http://localhost:4200` → user updating FRONTEND_ORIGIN.
 - 2026-11-21 — Live app confirmed working by user. Verified Render CORS preflight (PATCH + Authorization) allows the Vercel origin. All 10 steps done.
+- 2026-11-21 — Removed unused frontend test setup: karma.conf.js, tsconfig.spec.json, src/test.ts, angular.json `test` target, `test` script, 7 Karma/Jasmine devDependencies, VS Code `ng test` launch/task, README test sections. ng build clean, same bundle size.
