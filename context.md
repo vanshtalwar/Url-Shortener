@@ -8,14 +8,15 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
 ## Current status
 - Assumptions 1–10 confirmed by user.
 - Steps 1–10: ✅ built. Backend: 48 tests pass. Frontend: `ng build` clean (Node 16, also tested on 22 and 24).
-- Waiting on user (see README):
+- 🎉 v1 live end to end. Remaining items:
   - Review the build (incl. "Decisions made during build" below).
   - `backend/.env` created: Atlas URI (cluster0.1kjtoqy, db `url-shortener`), generated JWT_SECRET + VISITOR_HASH_SALT. Atlas connection ✅ verified. Google Client ID ✅ set in `.env` and both frontend environment files (public value, safe to commit).
   - Local run ✅ confirmed working by user (2026-11-21).
   - Atlas Network Access opened for Render (done by user 2026-11-21).
   - Initial commit made (author Vansh Talwar, no Claude co-author — user rule). Remote: https://github.com/vanshtalwar/Url-Shortener.git. Pushed ✅ (`c6fff9c`, private repo, `main` tracks `origin/main`; gh logged in as vanshtalwar).
   - Render backend ✅ live: https://url-shortener-z283.onrender.com (manual Web Service, root `backend`; /health 200, DB reachable). `apiUrl` set in environment.prod.ts.
-  - Next: Vercel (root `frontend`) → set Render `FRONTEND_ORIGIN` to Vercel URL → add Vercel URL to Google Authorized JavaScript origins → live check.
+  - Vercel frontend ✅ live: https://url-shortener-phi-kohl.vercel.app (root `frontend`, no env vars). SPA rewrite + prod bundle verified.
+  - Render `FRONTEND_ORIGIN` = Vercel URL ✅; Google origin added ✅. Live app ✅ confirmed working by user (sign-in → /links).
 
 ## Backend layout (`backend/`)
 - `src/config.ts` — env vars (`PORT`, `FRONTEND_ORIGIN`, `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `VISITOR_HASH_SALT`); `.env` loaded via dotenv.
@@ -99,3 +100,5 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
 - 2026-11-21 — Initial commit on `main` (repo-local git identity set), remote `origin` added. User opened Atlas network access. Push waiting on GitHub auth.
 - 2026-11-21 — Pushed `main` to GitHub (private). Verified: remote HEAD = local `c6fff9c`, author Vansh Talwar, no co-author/Claude text, 72 files, no `.env`/node_modules/dist.
 - 2026-11-21 — Backend deployed on Render (user, manual Web Service form instead of Blueprint). Verified live: /health 200, /api/links 401, unknown code 404. Set production `apiUrl`; prod bundle checked (Render URL, no localhost).
+- 2026-11-21 — Frontend deployed on Vercel. Verified: / and /links 200, bundle points at Render. Render CORS still `http://localhost:4200` → user updating FRONTEND_ORIGIN.
+- 2026-11-21 — Live app confirmed working by user. Verified Render CORS preflight (PATCH + Authorization) allows the Vercel origin. All 10 steps done.

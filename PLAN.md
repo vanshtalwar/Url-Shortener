@@ -71,7 +71,7 @@ A link owned by another user returns 404 (not 403), so link IDs can't be probed.
 | 7 | Frontend scaffold + login page | ✅ |
 | 8 | Links page (create, table, edit, delete, QR) | ✅ |
 | 9 | Link detail / analytics page | ✅ |
-| 10 | Deployment + README | ✅ config + README · ⏳ live deploy needs your accounts |
+| 10 | Deployment + README | ✅ live: Render + Vercel |
 
 ### 1. Backend scaffold
 TypeScript, Express, Mongoose, `.env` config, CORS for the frontend origin, `trust proxy` (for Render), Jest + supertest setup, `GET /health`.
