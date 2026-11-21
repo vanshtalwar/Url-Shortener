@@ -1,0 +1,23 @@
+# Render Blueprint: New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: url-shortener-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: MONGODB_URI
+        sync: false # paste your Atlas connection string when prompted
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false # your Vercel URL, e.g. https://url-shortener.vercel.app
+      - key: JWT_SECRET
+        generateValue: true
+      - key: VISITOR_HASH_SALT
+        generateValue: true
+      - key: MONGOMS_DISABLE_POSTINSTALL
+        value: "1" # skip downloading the test-only MongoDB binary during build

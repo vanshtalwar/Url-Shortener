@@ -1,0 +1,14 @@
+import { Schema, model } from 'mongoose';
+
+const clickSchema = new Schema({
+  link: { type: Schema.Types.ObjectId, ref: 'Link', required: true, index: true },
+  ts: { type: Date, default: Date.now },
+  referrer: { type: String, default: '' }, // hostname only; '' = direct / unknown
+  browser: { type: String, default: 'Unknown' },
+  os: { type: String, default: 'Unknown' },
+  deviceType: { type: String, default: 'desktop' },
+  isBot: { type: Boolean, default: false },
+  visitorHash: { type: String, required: true }, // sha256(salt + ip + user-agent); raw IP never stored
+});
+
+export const Click = model('Click', clickSchema);

@@ -1,0 +1,74 @@
+<section class="card">
+  <h2>Shorten a link</h2>
+  <form class="form-row" (ngSubmit)="create()">
+    <input class="grow" name="url" type="url" placeholder="https://example.com/long/page" [(ngModel)]="url" required />
+    <input name="alias" placeholder="Custom alias (optional)" [(ngModel)]="alias" />
+    <label class="muted">
+      Expires
+      <input name="expiresAt" type="datetime-local" [(ngModel)]="expiresAt" />
+    </label>
+    <button type="submit" [disabled]="creating || !url.trim()">Shorten</button>
+  </form>
+  <p class="error" *ngIf="error">{{ error }}</p>
+</section>
+
+<section class="card" *ngIf="qr">
+  <div class="qr">
+    <img [src]="qr.dataUrl" alt="QR code for {{ shortUrl(qr.code) }}" width="256" height="256" />
+    <div>
+      <p><strong>{{ shortUrl(qr.code) }}</strong></p>
+      <a class="button" [href]="qr.dataUrl" [download]="qr.code + '-qr.png'">Download PNG</a>
+      <button type="button" class="secondary" (click)="qr = null">Close</button>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>My links</h2>
+  <p class="muted" *ngIf="loading">Loading…</p>
+  <p class="muted" *ngIf="!loading && links.length === 0">No links yet.</p>
+
+  <table *ngIf="links.length > 0">
+    <thead>
+      <tr>
+        <th>Short link</th>
+        <th>Destination</th>
+        <th>Clicks</th>
+        <th>Expires</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <ng-container *ngFor="let link of links">
+        <tr *ngIf="editingId !== link.id">
+          <td><a [href]="shortUrl(link.code)" target="_blank" rel="noopener">{{ link.code }}</a></td>
+          <td class="truncate" [title]="link.url">{{ link.url }}</td>
+          <td>{{ link.clickCount }}</td>
+          <td>
+            <span *ngIf="!link.expiresAt" class="muted">Never</span>
+            <span *ngIf="link.expiresAt" [class.error]="isExpired(link)">
+              {{ isExpired(link) ? 'Expired' : (link.expiresAt | date: 'medium') }}
+            </span>
+          </td>
+          <td class="actions">
+            <a class="button secondary" [routerLink]="['/links', link.id]">Stats</a>
+            <button class="secondary" (click)="copy(link)">Copy</button>
+            <button class="secondary" (click)="showQr(link)">QR</button>
+            <button class="secondary" (click)="startEdit(link)">Edit</button>
+            <button class="danger" (click)="remove(link)">Delete</button>
+          </td>
+        </tr>
+        <tr *ngIf="editingId === link.id">
+          <td><input name="editAlias" [(ngModel)]="edit.alias" /></td>
+          <td><input class="grow" name="editUrl" type="url" [(ngModel)]="edit.url" /></td>
+          <td>{{ link.clickCount }}</td>
+          <td><input name="editExpiresAt" type="datetime-local" [(ngModel)]="edit.expiresAt" /></td>
+          <td class="actions">
+            <button (click)="saveEdit(link)">Save</button>
+            <button class="secondary" (click)="editingId = null">Cancel</button>
+          </td>
+        </tr>
+      </ng-container>
+    </tbody>
+  </table>
+</section>

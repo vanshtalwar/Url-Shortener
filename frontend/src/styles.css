@@ -1,0 +1,40 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #e2e5ea;
+  --text: #1d2330;
+  --muted: #667085;
+  --accent: #2f6fed;
+  --danger: #d03a3a;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+.center { max-width: 400px; margin: 60px auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.muted { color: var(--muted); }
+.error { color: var(--danger); }
+
+button, a.button { font: inherit; display: inline-block; text-decoration: none; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+button.secondary, a.button.secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+button.danger { background: var(--surface); color: var(--danger); border-color: var(--danger); }
+button:disabled { opacity: 0.6; cursor: default; }
+input { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { color: var(--muted); font-weight: 500; font-size: 14px; }
+
+.form-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.grow { flex: 1; min-width: 220px; width: 100%; }
+.truncate { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; gap: 6px; justify-content: flex-end; }
+.qr { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.tile { display: flex; flex-direction: column; gap: 4px; }
+.tile strong { font-size: 28px; }
+.chart { position: relative; height: 260px; }
+.breakdowns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.num { text-align: right; width: 60px; }
