@@ -11,13 +11,16 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <script>
     // Apply the saved/system theme before Angular boots, so the page never flashes the wrong theme.
     // Same rule as ThemeService (src/app/ui/theme.service.ts); keep the two in sync.
+    // Marketing pages always follow the system setting; the saved choice applies to the dashboard,
+    // the auth pages (paths in src/app/route-matchers.ts) and link-in-bio pages.
     (function () {
       var pref = null;
-      try { pref = localStorage.getItem('zelqit-theme'); } catch (e) {}
+      var saved = /^\/(?:(?:app|links|login|signup|check-email|verify-email|forgot-password|reset-password)(?:\/|$)|@)/.test(location.pathname);
+      if (saved) try { pref = localStorage.getItem('zelqit-theme'); } catch (e) {}
       var dark = pref === 'dark' || (pref !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.classList.toggle('dark', dark);
     })();

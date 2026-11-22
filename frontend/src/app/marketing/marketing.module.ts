@@ -5,7 +5,6 @@ import { RouterModule, Routes } from '@angular/router';
 import { UiModule } from '../ui/ui.module';
 import { MarketingLayoutComponent } from './marketing-layout.component';
 import { LandingComponent } from './landing.component';
-import { HeroSceneComponent } from './hero-scene.component';
 import { FeaturesComponent } from './features.component';
 import { PricingComponent } from './pricing.component';
 import { AboutComponent } from './about.component';
@@ -35,7 +34,7 @@ const routes: Routes = [
 
 @NgModule({
   declarations: [
-    MarketingLayoutComponent, LandingComponent, HeroSceneComponent, FeaturesComponent, PricingComponent, AboutComponent, ContactComponent, LegalComponent,
+    MarketingLayoutComponent, LandingComponent, FeaturesComponent, PricingComponent, AboutComponent, ContactComponent, LegalComponent,
     BlogIndexComponent, BlogArticleComponent,
   ],
   imports: [CommonModule, FormsModule, UiModule, RouterModule.forChild(routes)],

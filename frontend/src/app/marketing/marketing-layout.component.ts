@@ -1,13 +1,17 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
+import { ThemeService } from '../ui/theme.service';
 
-/** Public site shell: glass header with nav, footer with legal links and MaxMind attribution. */
+/**
+ * Public site shell: glass header with nav, footer with legal links and MaxMind attribution.
+ * No theme toggle here: marketing pages follow the visitor's system setting.
+ */
 @Component({
   selector: 'app-marketing-layout',
   templateUrl: './marketing-layout.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MarketingLayoutComponent {
+export class MarketingLayoutComponent implements OnDestroy {
   menuOpen = false;
   readonly year = new Date().getFullYear();
   readonly nav = [
@@ -29,5 +33,11 @@ export class MarketingLayoutComponent {
     },
   ];
 
-  constructor(public auth: AuthService) {}
+  constructor(public auth: AuthService, private theme: ThemeService) {
+    theme.followSystem(true);
+  }
+
+  ngOnDestroy(): void {
+    this.theme.followSystem(false);
+  }
 }

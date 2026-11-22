@@ -9,7 +9,6 @@
     </nav>
 
     <div class="flex items-center gap-2">
-      <z-theme-toggle></z-theme-toggle>
       <ng-container *ngIf="auth.isLoggedIn(); else guest">
         <a zButton routerLink="/app" size="sm" class="hidden sm:inline-flex">Dashboard</a>
       </ng-container>

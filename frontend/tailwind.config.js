@@ -16,6 +16,7 @@ module.exports = {
         muted: token('muted'), // secondary text
         accent: token('accent'), // links / highlighted text (readable on canvas)
         brand: { from: token('brand-from'), to: token('brand-to'), glow: token('brand-glow') },
+        tint: token('tint'), // landing-section accent: 3D, decoration, never text on cream/lavender
         success: token('success'),
         warning: token('warning'),
         danger: token('danger'),
@@ -23,10 +24,12 @@ module.exports = {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         display: ['"Space Grotesk"', 'Inter', 'system-ui', 'sans-serif'],
+        serif: ['Fraunces', 'Georgia', 'serif'], // italic accent words in the landing headlines
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       backgroundImage: {
         brand: 'linear-gradient(135deg, rgb(var(--brand-from)), rgb(var(--brand-to)))',
+        cta: 'linear-gradient(135deg, rgb(var(--cta-from)), rgb(var(--cta-to)))',
       },
       boxShadow: {
         soft: '0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.18)',

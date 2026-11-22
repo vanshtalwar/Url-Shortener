@@ -1,6 +1,9 @@
 import { UrlMatchResult, UrlSegment } from '@angular/router';
 
-/** Top-level paths served by the auth pages module (kept at the root so URLs stay /login, /signup, …). */
+/**
+ * Top-level paths served by the auth pages module (kept at the root so URLs stay /login, /signup, …).
+ * The theme script in src/index.html lists them too (those pages use the saved theme); keep both in sync.
+ */
 const AUTH_PATHS = ['login', 'signup', 'check-email', 'verify-email', 'forgot-password', 'reset-password'];
 
 /** Matches /login, /signup, … without consuming the segment, so the auth module's own routes see it. */

@@ -15,11 +15,16 @@ function readPreference(): ThemePreference {
   }
 }
 
-/** Light/dark theme: follows the OS unless the user picks one. The inline script in index.html applies it first. */
+/**
+ * Light/dark theme: follows the OS unless the user picks one. The inline script in index.html applies it first.
+ * Marketing pages call `followSystem(true)`: they always use the OS setting, and the saved choice comes back
+ * when the visitor returns to the dashboard.
+ */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   private readonly systemDark = window.matchMedia('(prefers-color-scheme: dark)');
   readonly preference$ = new BehaviorSubject<ThemePreference>(readPreference());
+  private systemOnly = false;
 
   constructor() {
     this.systemDark.addEventListener('change', () => this.apply());
@@ -27,8 +32,14 @@ export class ThemeService {
   }
 
   get isDark(): boolean {
-    const pref = this.preference$.value;
+    const pref = this.systemOnly ? 'system' : this.preference$.value;
     return pref === 'dark' || (pref === 'system' && this.systemDark.matches);
+  }
+
+  /** While on, ignore the saved choice (without forgetting it). */
+  followSystem(on: boolean): void {
+    this.systemOnly = on;
+    this.apply();
   }
 
   /** system → light → dark → system */

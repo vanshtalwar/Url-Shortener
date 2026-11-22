@@ -19,6 +19,9 @@
     --success: 21 128 61;
     --warning: 180 83 9;
     --danger: 185 28 28; /* red-700: red-600 was 4.35:1 on surface-2 */
+    /* Landing final CTA gradient: violet → a coral dark enough for white text (the palette coral is 2.8:1). */
+    --cta-from: 124 58 237;
+    --cta-to: 201 63 51;
     color-scheme: light;
   }
 
@@ -37,8 +40,127 @@
     color-scheme: dark;
   }
 
+  /* Landing-section palettes (prompts/zelqit-frontend.md §4.4). Fixed whatever the theme, so each sets every
+     colour token. --tint is the section accent for 3D objects, particles and decoration; on cream and lavender
+     it fails as text, so text there uses ink / muted / accent. Run scripts/ui-check/contrast.mjs after changes. */
+  [data-palette='hero'], [data-palette='protect'] {
+    --canvas: 7 6 11;
+    --surface: 15 13 23;
+    --surface-2: 22 19 37;
+    --line: 39 35 58;
+    --ink: 244 243 255;
+    --muted: 161 159 184;
+    --accent: 167 139 250;
+    --brand-glow: 167 139 250;
+    --tint: 139 92 246; /* violet */
+    --headline-accent: 167 139 250;
+    --accent-underline: 0;
+    --success: 74 222 128;
+    --warning: 251 191 36;
+    --danger: 248 113 113;
+    color-scheme: dark;
+  }
+
+  [data-palette='protect'] {
+    --accent: 245 184 61;
+    --tint: 245 184 61; /* amber */
+    --headline-accent: 245 184 61;
+  }
+
+  [data-palette='share'], [data-palette='pricing'] {
+    --canvas: 245 241 234; /* cream */
+    --surface: 255 252 247;
+    --surface-2: 237 231 221;
+    --line: 222 213 199;
+    --ink: 20 18 31;
+    --muted: 87 80 74;
+    --accent: 109 40 217;
+    --brand-glow: 139 92 246;
+    --tint: 255 107 91; /* coral */
+    --headline-accent: 20 18 31; /* ink; the coral underlines it instead */
+    --accent-underline: 1;
+    --success: 22 101 52;
+    --warning: 161 72 6;
+    --danger: 185 28 28;
+    color-scheme: light;
+  }
+
+  [data-palette='pricing'] {
+    --tint: 245 184 61; /* amber */
+  }
+
+  [data-palette='data'] {
+    --canvas: 30 18 56; /* deep violet */
+    --surface: 41 27 73;
+    --surface-2: 52 36 89;
+    --line: 72 54 114;
+    --ink: 245 243 255;
+    --muted: 192 184 220;
+    --accent: 61 214 181;
+    --brand-glow: 167 139 250;
+    --tint: 61 214 181; /* mint */
+    --headline-accent: 61 214 181;
+    --accent-underline: 0;
+    --success: 74 222 128;
+    --warning: 251 191 36;
+    --danger: 252 140 140;
+    color-scheme: dark;
+  }
+
+  [data-palette='globe'] {
+    --canvas: 11 16 38; /* midnight blue */
+    --surface: 19 26 54;
+    --surface-2: 27 36 69;
+    --line: 45 56 94;
+    --ink: 243 245 255;
+    --muted: 166 175 204;
+    --accent: 61 214 181;
+    --brand-glow: 167 139 250;
+    --tint: 61 214 181; /* mint */
+    --headline-accent: 61 214 181;
+    --accent-underline: 0;
+    --success: 74 222 128;
+    --warning: 251 191 36;
+    --danger: 248 113 113;
+    color-scheme: dark;
+  }
+
+  [data-palette='test'] {
+    --canvas: 236 232 255; /* pale lavender */
+    --surface: 255 255 255;
+    --surface-2: 226 220 252;
+    --line: 209 201 245;
+    --ink: 20 18 31;
+    --muted: 80 74 108;
+    --accent: 109 40 217;
+    --brand-glow: 139 92 246;
+    --tint: 255 107 91; /* coral */
+    --headline-accent: 20 18 31; /* ink; the coral underlines it instead */
+    --accent-underline: 1;
+    --success: 22 101 52;
+    --warning: 161 72 6;
+    --danger: 185 28 28;
+    color-scheme: light;
+  }
+
+  [data-palette] {
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--ink));
+  }
+
   body {
     @apply bg-canvas font-sans text-ink antialiased;
+  }
+
+  /* The 3D experience has drawn this anchor (src/app/experience): hide its SVG stand-in, keeping its space. */
+  [data-xp-drawn] > svg {
+    visibility: hidden;
+  }
+
+  /* With a section palette on <html> (landing), <html> paints the page colour. An opaque <body> would hide the
+     particles and 3D layered behind the page (negative z-index). */
+  html[data-palette] body {
+    background-color: transparent;
   }
 
   h1, h2, h3, h4 {
@@ -66,6 +188,19 @@
 
 /* Tables in the app and marketing pages (pricing comparison, links list). */
 @layer components {
+  /* Giant editorial headlines on the landing journey: Space Grotesk with one Fraunces italic accent word. */
+  .xp-headline { @apply font-display font-bold tracking-tight; line-height: 0.95; text-wrap: balance; }
+  /* On cream and lavender the section accent fails as text, so the word stays ink and the accent underlines it. */
+  .xp-accent {
+    @apply font-serif font-semibold italic;
+    color: rgb(var(--headline-accent));
+    text-decoration-line: underline;
+    text-decoration-color: rgb(var(--tint) / var(--accent-underline));
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.12em;
+    text-decoration-skip-ink: none;
+  }
+
   .data-table { @apply w-full border-collapse text-sm; }
   .data-table th, .data-table td { @apply border-b border-line px-4 py-3 text-left align-middle; }
   .data-table thead th { @apply bg-surface-2 font-medium text-muted; }
