@@ -41,9 +41,9 @@ url-shortener/
 ```
 
 ## Data model
-- **User:** `googleId` (unique), `email`, `name`
-- **Link:** `owner`, `code` (unique), `url`, `expiresAt?`, `clickCount`, `createdAt`
-- **Click:** `link` (indexed), `ts`, `referrer`, `browser`, `os`, `deviceType` (parsed with `ua-parser-js`), `isBot`, `visitorHash`
+- **User:** `googleId` (unique), `email`
+- **Link:** `owner`, `code` (unique), `url`, `expiresAt?`, `createdAt` (click counts are computed from clicks)
+- **Click:** `link`, `clickedAt`, `referrer`, `browser`, `os`, `deviceType` (parsed with `ua-parser-js`), `isBot`, `visitorHash`; index `{link, isBot}`
 
 ## API
 | Method | Path | Auth | Purpose |

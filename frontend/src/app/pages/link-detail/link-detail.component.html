@@ -6,7 +6,7 @@
     <h2><a [href]="shortUrl(stats.link.code)" target="_blank" rel="noopener">{{ shortUrl(stats.link.code) }}</a></h2>
     <p class="muted truncate" [title]="stats.link.url">→ {{ stats.link.url }}</p>
     <label>
-      <input type="checkbox" [(ngModel)]="includeBots" (change)="load()" />
+      <input type="checkbox" [(ngModel)]="includeBots" (change)="reload()" />
       Include bot clicks
     </label>
   </section>
@@ -30,7 +30,7 @@
   <section class="breakdowns" *ngIf="stats.total > 0">
     <ng-container *ngTemplateOutlet="breakdown; context: { title: 'Referrers', items: stats.referrers }"></ng-container>
     <ng-container *ngTemplateOutlet="breakdown; context: { title: 'Browsers', items: stats.browsers }"></ng-container>
-    <ng-container *ngTemplateOutlet="breakdown; context: { title: 'Operating systems', items: stats.os }"></ng-container>
+    <ng-container *ngTemplateOutlet="breakdown; context: { title: 'Operating systems', items: stats.operatingSystems }"></ng-container>
     <ng-container *ngTemplateOutlet="breakdown; context: { title: 'Devices', items: stats.devices }"></ng-container>
   </section>
 </ng-container>

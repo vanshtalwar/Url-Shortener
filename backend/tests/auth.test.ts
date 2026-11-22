@@ -11,7 +11,7 @@ describe('POST /api/auth/google', () => {
     const res = await request(testApp()).post('/api/auth/google').send({ credential: 'good:alice' });
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
-    expect(res.body.user).toMatchObject({ email: 'alice@example.com', name: 'alice' });
+    expect(res.body.user).toEqual({ id: expect.any(String), email: 'alice@example.com' });
   });
 
   it('creates the user only once across repeated logins', async () => {

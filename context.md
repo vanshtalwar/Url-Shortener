@@ -7,7 +7,8 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
 
 ## Current status
 - Assumptions 1–10 confirmed by user.
-- Steps 1–10: ✅ built. Backend: 48 tests pass. Frontend: `ng build` clean (Node 16, also tested on 22 and 24).
+- Steps 1–10: ✅ built. Audit fixes (2026-11-22) applied locally: backend 75 tests pass; frontend `ng build` clean (initial bundle 349 kB, stats page lazy).
+- ⚠️ PENDING (needs user go-ahead): push audit fixes → wait for Render deploy → run Atlas migration (`ts`→`clickedAt` etc., script tested; dry run on Atlas: 1 click, 1 link, 1 user, 2 old indexes) → user runs TRUST_PROXY_HOPS hotspot test (README).
 - 🎉 v1 live end to end. Remaining items:
   - Review the build (incl. "Decisions made during build" below).
   - `backend/.env` created: Atlas URI (cluster0.1kjtoqy, db `url-shortener`), generated JWT_SECRET + VISITOR_HASH_SALT. Atlas connection ✅ verified. Google Client ID ✅ set in `.env` and both frontend environment files (public value, safe to commit).
@@ -19,47 +20,46 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
   - Render `FRONTEND_ORIGIN` = Vercel URL ✅; Google origin added ✅. Live app ✅ confirmed working by user (sign-in → /links).
 
 ## Backend layout (`backend/`)
-- `src/config.ts` — env vars (`PORT`, `FRONTEND_ORIGIN`, `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `VISITOR_HASH_SALT`); `.env` loaded via dotenv.
-- `src/app.ts` — `createApp()`: trust proxy, CORS, JSON body, `GET /health`. Kept separate from server so tests use it without a DB connection or open port.
-- `src/server.ts` — connects Mongoose, then listens.
-- `src/models/user.ts` — User (googleId unique, email, name).
-- `src/middleware/auth.ts` — `signToken`, `requireAuth` (Bearer JWT, 7 days → `res.locals.userId`).
-- `src/routes/auth.ts` — `POST /api/auth/google`; Google check is injectable via `createApp({ verifyGoogleToken })`.
-- `src/models/link.ts` — Link (owner, code unique, url, expiresAt, clickCount = human clicks), `serializeLink`.
-- `src/routes/links.ts` — `POST/GET /api/links`, `PATCH/DELETE /api/links/:id`; alias/URL/expiry validation; `findOwnedLink` returns null for other users' links (→ 404).
-- `src/models/click.ts` — Click (link, ts, referrer hostname, browser, os, deviceType, isBot, visitorHash).
-- `src/routes/redirect.ts` — `GET /:code`: 404 unknown, 410 expired, else record click and 302. Mounted last in `app.ts`. `VISITOR_HASH_SALT` env var.
-- `src/stats.ts` — `linkStats(linkId, includeBots)`; served at `GET /api/links/:id/stats?bots=true` (response also includes `link`).
-- `src/middleware/rateLimit.ts` — login 10/15min per IP, link writes 30/15min per user (all non-GET on /api/links), redirects 120/min per IP → 429.
-- Error handler in `app.ts`: Mongo duplicate key → 409, 4xx passthrough, else 500.
-- `tests/` — Jest + supertest (`npm test`). `tests/env.ts` sets test env vars; `tests/helpers.ts` has `useTestDb()` (in-memory Mongo), fake Google check (`good:<name>`), `loginAs()`.
-- Scripts: `dev` (tsx watch), `build` (tsc → `dist/`), `start`, `typecheck`, `test`.
-- Versions: Express 5, Mongoose 8, TypeScript 5, Jest 29, mongodb-memory-server (dev).
+- `src/config.ts` — `loadConfig(env)` (pure, frozen, validated at startup) + `config`. Required: `FRONTEND_ORIGIN`, `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `VISITOR_HASH_SALT`. Optional: `PORT`, `TRUST_PROXY_HOPS` (1), `LOGIN_RATE_LIMIT` (10/15min), `LINK_WRITE_RATE_LIMIT` (30/15min), `REDIRECT_RATE_LIMIT` (120/min).
+- `src/app.ts` — `createApp({ verifyGoogleToken?, rateLimits?, trustProxyHops? })`: no X-Powered-By, trust proxy, CORS, JSON, `/health`, `/api/auth`, `/api/links` (mounted with `requireAuth` then write limiter), redirect router last. Error handler: 4xx passthrough, else 500.
+- `src/server.ts` — connect, listen, graceful shutdown on SIGTERM/SIGINT (close server, disconnect Mongo).
+- `src/middleware/auth.ts` — `signToken` (7d), `requireAuth` → `res.locals.userId`.
+- `src/middleware/rateLimit.ts` — `createLimiters(limits)`; link-write limiter skips GET and throws if used before `requireAuth`.
+- `src/routes/auth.ts` — `POST /api/auth/google`; one shared `OAuth2Client` (caches Google certs).
+- `src/routes/links.ts` — `router.param('id')` loads caller's own link (404 otherwise); POST (alias → 409 if taken; random code retried ×3), GET list (click counts via aggregation), PATCH (partial, `findByIdAndUpdate`), GET `/:id/stats`, DELETE (link first, then clicks).
+- `src/routes/redirect.ts` — `GET /:code`: 404 / 410 / record click (GET only; HEAD not counted) / 302. 2 DB round trips.
+- `src/linkInput.ts` — `parseLinkInput(body, 'create'|'update', now)` pure validation; URL ≤ 2048 chars.
+- `src/shortCode.ts` — `randomCode()` (7 chars). `src/visit.ts` — `describeVisit(request, salt)` pure UA/referrer/hash parsing.
+- `src/stats.ts` — `linkStats(id, includeBots, today)` (one `$facet` incl. bot count), `humanClickCounts(ids)`, pure `fillDays(days, today)`.
+- Models: User (googleId, email), Link (owner, code unique, url, expiresAt; index owner+createdAt+_id), Click (link, clickedAt, referrer, browser, os, deviceType, isBot, visitorHash; index link+isBot).
+- `tests/` — 9 suites, 75 tests. `env.ts` sets env before config loads; `helpers.ts`: `useTestDb`, fake Google (`good:<name>`), `loginAs`, `listedClickCount`.
+- Scripts: `dev` (tsx watch), `build`, `start`, `typecheck`, `test`. Express 5, Mongoose 8, TS 5, Jest 29.
 
 ## Decisions made during build (not explicitly asked — review these)
 - Referrer stored as hostname only (e.g. `google.com`), not full URL; empty = "direct".
-- `Link.clickCount` (shown in the dashboard list) counts human clicks only; bots are in stats.
+- Dashboard `clickCount` = human clicks only, computed from clicks on each list load (stored counter removed in audit fixes: it could drift).
 - Clicks-per-day fills days with 0 from the first click to today (UTC), so the chart has no gaps.
 - Alias/code uniqueness is case-sensitive (`Abc` ≠ `abc`), but reserved words are checked case-insensitively because Express routes are case-insensitive.
 - `ua-parser-js` pinned to v1 (MIT); v2 is AGPL.
 - Frontend generated with `--skip-tests` (no Karma spec files); UI is verified manually per plan.
+- Unreadable User-Agents (no OS) stored as deviceType `unknown`; HEAD requests redirect but aren't clicks.
+- User `name` no longer stored/returned (was unused).
 - JWT + user stored in `localStorage` (simple; readable by any XSS on the page — acceptable for v1, no third-party scripts besides Google's).
 - App name shown in UI/title: "Shortly".
 - Frontend `@types/node` pinned to 16: the latest (26) breaks TypeScript 4.7.
 - Links table shows the alias/code as the link text (full short URL on copy/QR); one row editable at a time.
-- Stats response now includes the `link` object (so the detail page needs one request, not the whole list).
-- Angular initial bundle warning budget raised 500kb → 700kb (chart.js; ~144 kB gzipped). Alternative would be lazy-loading the detail page.
+- Stats response includes a `link` summary (id, code, url, expiresAt) so the detail page needs one request.
+- Stats page lazy-loaded (chart.js out of the initial bundle: 512 → 349 kB); bundle budget back to Angular's 500kb default.
 - Angular test scaffolding removed (user request): no frontend unit-test setup. `karma` still appears in package-lock.json only as a peer/dependency of `@angular-devkit/build-angular` (dev-only, not in the bundle).
 
 ## Frontend layout (`frontend/`, Angular 14, Node 16 via `.nvmrc`)
-- `src/environments/` — `apiUrl`, `googleClientId` (placeholders until user provides values).
-- `src/app/auth/` — `AuthService` (login → JWT in localStorage, logout), `AuthInterceptor` (Bearer header on API calls; 401 → logout), `AuthGuard` (→ /login).
-- `src/app/pages/login/` — loads Google Identity Services script, renders button, exchanges credential.
-- `src/app/links.service.ts` — `LinksService` (list/create/update/remove), `shortUrl(code)` = `${apiUrl}/${code}`.
-- `src/app/pages/links/` — create form (url, alias, expiry via datetime-local in user's timezone), table with Copy / QR / Edit (inline row) / Delete (confirm). Alias change asks for confirmation. QR panel with Download PNG (`qrcode`, allowed as CommonJS dep in angular.json).
-- `src/app/pages/link-detail/` — `/links/:id`: stat tiles (clicks, uniques, bots), include-bots checkbox, clicks-per-day bar chart (chart.js, tree-shaken registration), referrer/browser/OS/device tables with %.
-- Routes: `/login`, `/links`, `/links/:id` (both guarded), `**` → `/links`.
-- Global styles in `src/styles.css` (CSS variables, card/table/button styles).
+- `src/environments/` — `apiUrl`, `googleClientId`.
+- `src/app/auth/` — `AuthService` (user cached in memory, corrupted storage → logged out, `isLoggedIn` checks JWT `exp`, `clearSession`/`logout`), `AuthGuard` (clears expired session), `AuthInterceptor` (token only for exact API origin; 401 → logout), `GoogleSignInService` (loads + initializes GSI script once; `credential$`).
+- `src/app/pages/login/` — subscribes to `credential$` until destroyed, renders button.
+- `src/app/links.service.ts` — types (`Link`, `LinkSummary`, `LinkStats`, `LinkInput`), `LinksService`, pure `shortUrl`, `isExpired(expiresAt, now)`.
+- `src/app/pages/links/` — `LinksComponent` (list, inline edit sending only changed fields, copy with "Copied!", delete, trackBy), `LinkCreateFormComponent`, `QrPanelComponent`, `form-utils.ts`.
+- `src/app/pages/link-detail/` — lazy `LinkDetailModule`; `switchMap` drops stale responses, `takeUntil` cancels on leave; chart colour from `--accent`.
+- Routes: `/login`, `/links`, `/links/:id` (lazy; both guarded), `**` → `/links`.
 - Build: `nvm use && npx ng build`.
 
 ## Deployment
@@ -103,3 +103,4 @@ URL shortener with click analytics. Angular 14 frontend (Vercel), Express + Type
 - 2026-11-21 — Frontend deployed on Vercel. Verified: / and /links 200, bundle points at Render. Render CORS still `http://localhost:4200` → user updating FRONTEND_ORIGIN.
 - 2026-11-21 — Live app confirmed working by user. Verified Render CORS preflight (PATCH + Authorization) allows the Vercel origin. All 10 steps done.
 - 2026-11-21 — Removed unused frontend test setup: karma.conf.js, tsconfig.spec.json, src/test.ts, angular.json `test` target, `test` script, 7 Karma/Jasmine devDependencies, VS Code `ng test` launch/task, README test sections. ng build clean, same bundle size.
+- 2026-11-22 — Full adversarial audit (H1–H2, M1–M6, L1–L11), then all fixes applied. Backend: config validated/frozen + env-tunable proxy hops & rate limits; redirect 3→2 DB trips, stored clickCount removed (computed); shared OAuth2Client; duplicate-key handling moved into links routes with random-code retry; limiter policy in one place + fails loudly; router.param ownership; pure validation/visit/fillDays; HEAD not counted; unknown devices; URL length cap; graceful shutdown; X-Powered-By off; compound indexes; renamed ts→clickedAt, os→operatingSystems; removed unused name/includeBots/createdAt/exports. Frontend: edit sends only changed fields (H2), stats switchMap/takeUntil (M3), GSI loaded once (M4), components split, lazy stats page, JWT expiry check, cached user, exact-origin interceptor, copy feedback, trackBy. Verified: 75 tests ×3, ng build clean, built server smoke test (incl. SIGTERM exit 0), migration tested on old-format data (idempotent) + read-only dry run on Atlas. User's local `npm run dev` auto-reloaded the new code and created the new indexes on Atlas (harmless). Not yet pushed/deployed/migrated.

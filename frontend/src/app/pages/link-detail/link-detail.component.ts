@@ -1,9 +1,15 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { EMPTY, Subject, catchError, startWith, switchMap, takeUntil, tap } from 'rxjs';
 import { BarController, BarElement, CategoryScale, Chart, LinearScale, Tooltip } from 'chart.js';
 import { LinkStats, LinksService, shortUrl } from '../../links.service';
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
+
+/** Bar colour follows the app's --accent CSS variable. */
+function accentColor(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+}
 
 @Component({
   selector: 'app-link-detail',
@@ -15,31 +21,46 @@ export class LinkDetailComponent implements OnInit, OnDestroy {
   stats: LinkStats | null = null;
   includeBots = false;
   error = '';
-  shortUrl = shortUrl;
+  readonly shortUrl = shortUrl;
 
-  private id = '';
   private chart?: Chart;
+  private readonly reload$ = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(private route: ActivatedRoute, private linksService: LinksService) {}
 
   ngOnInit(): void {
-    this.id = this.route.snapshot.paramMap.get('id') ?? '';
-    this.load();
+    const id = this.route.snapshot.paramMap.get('id') ?? '';
+    this.reload$
+      .pipe(
+        startWith(undefined),
+        tap(() => (this.error = '')),
+        // switchMap drops an older, slower response when the bot toggle changes again.
+        switchMap(() =>
+          this.linksService.stats(id, this.includeBots).pipe(
+            catchError((err) => {
+              this.error = err.status === 404 ? 'Link not found.' : 'Could not load stats.';
+              return EMPTY;
+            }),
+          ),
+        ),
+        // Cancels an in-flight request when the page is left, so no chart is drawn afterwards.
+        takeUntil(this.destroy$),
+      )
+      .subscribe((stats) => {
+        this.stats = stats;
+        this.drawChart(stats);
+      });
   }
 
   ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
     this.chart?.destroy();
   }
 
-  load(): void {
-    this.error = '';
-    this.linksService.stats(this.id, this.includeBots).subscribe({
-      next: (stats) => {
-        this.stats = stats;
-        this.drawChart(stats);
-      },
-      error: (err) => (this.error = err.status === 404 ? 'Link not found.' : 'Could not load stats.'),
-    });
+  reload(): void {
+    this.reload$.next();
   }
 
   percent(count: number): number {
@@ -52,7 +73,7 @@ export class LinkDetailComponent implements OnInit, OnDestroy {
       type: 'bar',
       data: {
         labels: stats.clicksPerDay.map((d) => d.date),
-        datasets: [{ label: 'Clicks', data: stats.clicksPerDay.map((d) => d.count), backgroundColor: '#2f6fed' }],
+        datasets: [{ label: 'Clicks', data: stats.clicksPerDay.map((d) => d.count), backgroundColor: accentColor() }],
       },
       options: {
         maintainAspectRatio: false,

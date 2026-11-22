@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { Click } from '../src/models/click';
+import { fillDays } from '../src/stats';
 import { loginAs, testApp, useTestDb } from './helpers';
 
 useTestDb();
@@ -15,11 +16,11 @@ async function setup() {
 
   const human = { link: link.id, isBot: false, browser: 'Chrome', os: 'macOS', deviceType: 'desktop' };
   await Click.insertMany([
-    { ...human, ts: day(2), referrer: 'google.com', visitorHash: 'v1' },
-    { ...human, ts: day(2), referrer: 'google.com', visitorHash: 'v1' },
-    { ...human, ts: day(0), referrer: '', visitorHash: 'v2', browser: 'Mobile Safari', os: 'iOS', deviceType: 'mobile' },
-    { ...human, ts: day(0), referrer: 't.co', visitorHash: 'v3' },
-    { link: link.id, isBot: true, ts: day(0), referrer: '', browser: 'Unknown', os: 'Unknown', deviceType: 'desktop', visitorHash: 'bot1' },
+    { ...human, clickedAt: day(2), referrer: 'google.com', visitorHash: 'v1' },
+    { ...human, clickedAt: day(2), referrer: 'google.com', visitorHash: 'v1' },
+    { ...human, clickedAt: day(0), referrer: '', visitorHash: 'v2', browser: 'Mobile Safari', os: 'iOS', deviceType: 'mobile' },
+    { ...human, clickedAt: day(0), referrer: 't.co', visitorHash: 'v3' },
+    { link: link.id, isBot: true, clickedAt: day(0), referrer: '', browser: 'Unknown', os: 'Unknown', deviceType: 'unknown', visitorHash: 'bot1' },
   ]);
   return { app, alice, bob, link };
 }
@@ -31,8 +32,7 @@ describe('GET /api/links/:id/stats', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      link: link,
-      includeBots: false,
+      link: { id: link.id, code: link.code, url: link.url, expiresAt: null },
       total: 4,
       uniqueVisitors: 3,
       botClicks: 1,
@@ -50,7 +50,7 @@ describe('GET /api/links/:id/stats', () => {
         { value: 'Chrome', count: 3 },
         { value: 'Mobile Safari', count: 1 },
       ],
-      os: [
+      operatingSystems: [
         { value: 'macOS', count: 3 },
         { value: 'iOS', count: 1 },
       ],
@@ -64,7 +64,7 @@ describe('GET /api/links/:id/stats', () => {
   it('includes bots when bots=true', async () => {
     const { app, alice, link } = await setup();
     const res = await request(app).get(`/api/links/${link.id}/stats?bots=true`).set(alice);
-    expect(res.body).toMatchObject({ includeBots: true, total: 5, uniqueVisitors: 4, botClicks: 1 });
+    expect(res.body).toMatchObject({ total: 5, uniqueVisitors: 4, botClicks: 1 });
     expect(res.body.clicksPerDay.at(-1)).toEqual({ date: dateStr(0), count: 3 });
     expect(res.body.referrers[0]).toEqual({ value: 'direct', count: 2 });
   });
@@ -88,5 +88,20 @@ describe('GET /api/links/:id/stats', () => {
     await request(app).get('/e2e').set('Referer', 'https://github.com/y');
     const res = await request(app).get(`/api/links/${fresh.id}/stats`).set(alice);
     expect(res.body).toMatchObject({ total: 2, uniqueVisitors: 1, referrers: [{ value: 'github.com', count: 2 }] });
+  });
+});
+
+describe('fillDays', () => {
+  it('fills gaps with zeros up to and including today', () => {
+    expect(fillDays([{ _id: '2026-02-27', count: 2 }, { _id: '2026-03-01', count: 1 }], '2026-03-02')).toEqual([
+      { date: '2026-02-27', count: 2 },
+      { date: '2026-02-28', count: 0 },
+      { date: '2026-03-01', count: 1 },
+      { date: '2026-03-02', count: 0 },
+    ]);
+  });
+
+  it('returns nothing when there are no clicks', () => {
+    expect(fillDays([], '2026-03-02')).toEqual([]);
   });
 });

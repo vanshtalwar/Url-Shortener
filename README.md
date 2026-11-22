@@ -27,7 +27,7 @@ See [PLAN.md](PLAN.md) for the design and [context.md](context.md) for current s
 ### Backend (Node 22+)
 ```bash
 cd backend
-cp .env.example .env      # then fill in MONGODB_URI, GOOGLE_CLIENT_ID, JWT_SECRET, VISITOR_HASH_SALT
+cp .env.example .env      # then fill in FRONTEND_ORIGIN, MONGODB_URI, GOOGLE_CLIENT_ID, JWT_SECRET, VISITOR_HASH_SALT
 npm install
 npm run dev               # http://localhost:3000, check http://localhost:3000/health
 ```
@@ -75,7 +75,10 @@ The frontend builds on Vercel with its default Node version (tested locally with
 | GET | `/:code` | – | Redirect (302); 404 unknown, 410 expired |
 | GET | `/health` | – | Health check |
 
-Rate limits (429 when exceeded): login 10 per 15 min per IP; create/edit/delete 30 per 15 min per user; redirects 120 per min per IP.
+Rate limits (429 when exceeded): login 10 per 15 min per IP; create/edit/delete 30 per 15 min per user; redirects 120 per min per IP. Override with `LOGIN_RATE_LIMIT`, `LINK_WRITE_RATE_LIMIT`, `REDIRECT_RATE_LIMIT`.
+
+## Client IP behind proxies
+Unique visitors and per-IP rate limits depend on the app seeing the real client IP. `TRUST_PROXY_HOPS` (default `1`) is the number of reverse proxies in front of the app. To check it on Render: open one short link in the same browser once on Wi-Fi and once on a phone hotspot. If **Unique visitors** goes up by 2, the value is right; if only by 1, increase `TRUST_PROXY_HOPS` by one and redeploy. Too high a value lets clients fake their IP via `X-Forwarded-For`, so don't go higher than needed.
 
 ## Known limits
 - Render free tier sleeps when idle; the first request after a pause can take 30–60 s.

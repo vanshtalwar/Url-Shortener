@@ -8,14 +8,16 @@ import { AppComponent } from './app.component';
 import { AuthInterceptor } from './auth/auth.interceptor';
 import { LoginComponent } from './pages/login/login.component';
 import { LinksComponent } from './pages/links/links.component';
-import { LinkDetailComponent } from './pages/link-detail/link-detail.component';
+import { LinkCreateFormComponent } from './pages/links/link-create-form.component';
+import { QrPanelComponent } from './pages/links/qr-panel.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     LoginComponent,
     LinksComponent,
-    LinkDetailComponent
+    LinkCreateFormComponent,
+    QrPanelComponent
   ],
   imports: [
     BrowserModule,

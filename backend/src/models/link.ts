@@ -1,27 +1,16 @@
-import { Schema, Types, model, type HydratedDocument, type InferSchemaType } from 'mongoose';
+import { Schema, Types, model, type InferSchemaType } from 'mongoose';
 
 const linkSchema = new Schema(
   {
-    owner: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    owner: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     code: { type: String, required: true, unique: true },
     url: { type: String, required: true },
     expiresAt: { type: Date, default: null },
-    // Human (non-bot) clicks only; the stats endpoint has the full breakdown.
-    clickCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
+// Serves "my links, newest first" without an in-memory sort.
+linkSchema.index({ owner: 1, createdAt: -1, _id: -1 });
 
 export const Link = model('Link', linkSchema);
-export type LinkDoc = HydratedDocument<InferSchemaType<typeof linkSchema>> & { _id: Types.ObjectId };
-
-export function serializeLink(link: LinkDoc) {
-  return {
-    id: link.id as string,
-    code: link.code,
-    url: link.url,
-    expiresAt: link.expiresAt,
-    clickCount: link.clickCount,
-    createdAt: link.createdAt,
-  };
-}
+export type LinkRecord = InferSchemaType<typeof linkSchema> & { _id: Types.ObjectId };

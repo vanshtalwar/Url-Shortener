@@ -4,10 +4,9 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-export interface User {
+interface User {
   id: string;
   email: string;
-  name: string;
 }
 
 interface LoginResponse {
@@ -18,8 +17,29 @@ interface LoginResponse {
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 
+function readStoredUser(): User | null {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY) ?? 'null');
+  } catch {
+    return null; // corrupted storage: treat as logged out
+  }
+}
+
+/** Expiry of a JWT in ms since epoch, or null if the token can't be read. Pure. */
+function tokenExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  // Read once; templates read `user` on every change detection.
+  private currentUser: User | null = readStoredUser();
+
   constructor(private http: HttpClient, private router: Router) {}
 
   get token(): string | null {
@@ -27,12 +47,13 @@ export class AuthService {
   }
 
   get user(): User | null {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return this.currentUser;
   }
 
-  isLoggedIn(): boolean {
-    return this.token !== null;
+  /** True only with a token that hasn't expired yet. */
+  isLoggedIn(now = Date.now()): boolean {
+    const token = this.token;
+    return token !== null && (tokenExpiry(token) ?? 0) > now;
   }
 
   /** Exchanges a Google ID token for our own JWT. */
@@ -41,13 +62,19 @@ export class AuthService {
       tap((res) => {
         localStorage.setItem(TOKEN_KEY, res.token);
         localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+        this.currentUser = res.user;
       }),
     );
   }
 
-  logout(): void {
+  clearSession(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    this.currentUser = null;
+  }
+
+  logout(): void {
+    this.clearSession();
     this.router.navigate(['/login']);
   }
 }

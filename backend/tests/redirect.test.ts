@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { Link } from '../src/models/link';
 import { Click } from '../src/models/click';
-import { loginAs, testApp, useTestDb } from './helpers';
+import { listedClickCount, loginAs, testApp, useTestDb } from './helpers';
 
 useTestDb();
 
@@ -23,7 +23,7 @@ async function setup(body: object = {}) {
 
 describe('GET /:code', () => {
   it('redirects with 302 and records a parsed click', async () => {
-    const { app } = await setup();
+    const { app, auth } = await setup();
     const res = await request(app)
       .get('/jump')
       .set('User-Agent', SAFARI_IPHONE)
@@ -40,7 +40,7 @@ describe('GET /:code', () => {
       deviceType: 'mobile',
       isBot: false,
     });
-    expect((await Link.findOne())!.clickCount).toBe(1);
+    expect(await listedClickCount(app, auth, 'jump')).toBe(1);
   });
 
   it('records desktop and direct visits', async () => {
@@ -50,11 +50,11 @@ describe('GET /:code', () => {
   });
 
   it('flags bots, still redirects, and does not count them in clickCount', async () => {
-    const { app } = await setup();
+    const { app, auth } = await setup();
     const res = await request(app).get('/jump').set('User-Agent', GOOGLEBOT);
     expect(res.status).toBe(302);
     expect((await Click.findOne())!.isBot).toBe(true);
-    expect((await Link.findOne())!.clickCount).toBe(0);
+    expect(await listedClickCount(app, auth, 'jump')).toBe(0);
   });
 
   it('hashes IP + User-Agent into a stable visitor id without storing the IP', async () => {
@@ -105,5 +105,38 @@ describe('GET /:code', () => {
     await request(app).delete(`/api/links/${link.id}`).set(auth);
     expect(await Click.countDocuments()).toBe(0);
     expect((await request(app).get('/jump')).status).toBe(404);
+  });
+
+  it('redirects HEAD requests without recording a click', async () => {
+    const { app } = await setup();
+    const res = await request(app).head('/jump').set('User-Agent', CHROME_MAC);
+    expect(res.status).toBe(302);
+    expect(await Click.countDocuments()).toBe(0);
+  });
+
+  it('records an unreadable User-Agent as unknown, not desktop', async () => {
+    const { app } = await setup();
+    await request(app).get('/jump').set('User-Agent', 'curl/8.4.0');
+    expect(await Click.findOne().lean()).toMatchObject({ browser: 'Unknown', os: 'Unknown', deviceType: 'unknown' });
+  });
+
+  describe('trust proxy hops', () => {
+    async function hashesFor(trustProxyHops: number) {
+      const app = testApp({ trustProxyHops });
+      const auth = { Authorization: `Bearer ${await loginAs(app, 'alice')}` };
+      await request(app).post('/api/links').set(auth).send({ url: 'https://example.com', alias: 'hops' });
+      // Two visitors behind the same outer proxy (9.9.9.9).
+      await request(app).get('/hops').set('X-Forwarded-For', '1.1.1.1, 9.9.9.9').set('User-Agent', CHROME_MAC);
+      await request(app).get('/hops').set('X-Forwarded-For', '2.2.2.2, 9.9.9.9').set('User-Agent', CHROME_MAC);
+      return new Set((await Click.find().lean()).map((c) => c.visitorHash)).size;
+    }
+
+    it('with 1 hop, the proxy IP is taken as the visitor (both look the same)', async () => {
+      expect(await hashesFor(1)).toBe(1);
+    });
+
+    it('with 2 hops, the real client IPs are used', async () => {
+      expect(await hashesFor(2)).toBe(2);
+    });
   });
 });

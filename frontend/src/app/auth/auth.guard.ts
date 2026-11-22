@@ -7,6 +7,8 @@ export class AuthGuard implements CanActivate {
   constructor(private auth: AuthService, private router: Router) {}
 
   canActivate(): boolean | UrlTree {
-    return this.auth.isLoggedIn() || this.router.parseUrl('/login');
+    if (this.auth.isLoggedIn()) return true;
+    this.auth.clearSession(); // drop an expired token so the header doesn't still show a user
+    return this.router.parseUrl('/login');
   }
 }

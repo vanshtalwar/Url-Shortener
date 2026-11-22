@@ -1,40 +1,34 @@
-import { Component, ElementRef, NgZone, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
-import { environment } from '../../../environments/environment';
+import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
-
-// Global from Google Identity Services (https://accounts.google.com/gsi/client).
-declare const google: any;
+import { GoogleSignInService } from '../../auth/google-sign-in.service';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, OnDestroy {
   @ViewChild('googleButton', { static: true }) googleButton!: ElementRef<HTMLDivElement>;
   error = '';
+  private readonly destroy$ = new Subject<void>();
 
-  constructor(private auth: AuthService, private router: Router, private zone: NgZone) {}
+  constructor(private auth: AuthService, private router: Router, private googleSignIn: GoogleSignInService) {}
 
   ngOnInit(): void {
     if (this.auth.isLoggedIn()) {
       this.router.navigate(['/links']);
       return;
     }
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.onload = () => this.renderButton();
-    script.onerror = () => this.zone.run(() => (this.error = 'Could not load Google sign-in.'));
-    document.head.appendChild(script);
+    this.googleSignIn.credential$.pipe(takeUntil(this.destroy$)).subscribe((credential) => this.signIn(credential));
+    this.googleSignIn
+      .renderButton(this.googleButton.nativeElement)
+      .catch(() => (this.error = 'Could not load Google sign-in.'));
   }
 
-  private renderButton(): void {
-    google.accounts.id.initialize({
-      client_id: environment.googleClientId,
-      // Google calls this outside Angular's zone; re-enter so the view updates.
-      callback: (response: { credential: string }) => this.zone.run(() => this.signIn(response.credential)),
-    });
-    google.accounts.id.renderButton(this.googleButton.nativeElement, { theme: 'outline', size: 'large' });
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private signIn(credential: string): void {

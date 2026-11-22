@@ -1,115 +1,117 @@
-import { randomInt } from 'node:crypto';
-import { Router, type RequestHandler, type Response } from 'express';
-import { isValidObjectId } from 'mongoose';
-import { Link, serializeLink } from '../models/link';
+import { Router, type Response } from 'express';
+import { isValidObjectId, type Types } from 'mongoose';
+import { Link, type LinkRecord } from '../models/link';
 import { Click } from '../models/click';
-import { linkStats } from '../stats';
-import { requireAuth } from '../middleware/auth';
+import { parseLinkInput, type LinkInput } from '../linkInput';
+import { randomCode } from '../shortCode';
+import { humanClickCounts, linkStats } from '../stats';
 
-const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-const ALIAS_PATTERN = /^[A-Za-z0-9_-]{3,30}$/;
-// Express matches routes case-insensitively, so these are compared lowercased.
-const RESERVED_ALIASES = ['api', 'health'];
+const MAX_CODE_ATTEMPTS = 3;
 
-function randomCode(): string {
-  let code = '';
-  for (let i = 0; i < 7; i++) code += CODE_CHARS[randomInt(CODE_CHARS.length)];
-  return code;
+function isDuplicateKey(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === 11000;
 }
 
-/** Each validator returns an error message, or null when the value is fine. */
-function validateUrl(value: unknown): string | null {
-  if (typeof value !== 'string') return 'url is required';
-  try {
-    const { protocol } = new URL(value);
-    return protocol === 'http:' || protocol === 'https:' ? null : 'url must start with http:// or https://';
-  } catch {
-    return 'url is not a valid URL';
+function toLinkSummary(link: LinkRecord) {
+  return { id: link._id.toString(), code: link.code, url: link.url, expiresAt: link.expiresAt };
+}
+
+function toLinkResponse(link: LinkRecord, clickCount: number) {
+  return { ...toLinkSummary(link), clickCount };
+}
+
+async function clickCountOf(linkId: Types.ObjectId): Promise<number> {
+  return (await humanClickCounts([linkId])).get(linkId.toString()) ?? 0;
+}
+
+/** Returns null when the requested alias is taken. Random codes are retried on the (rare) collision. */
+async function insertLink(owner: string, input: LinkInput): Promise<LinkRecord | null> {
+  const fields = { owner, url: input.url, expiresAt: input.expiresAt ?? null };
+  if (input.alias) {
+    try {
+      return (await Link.create({ ...fields, code: input.alias })).toObject();
+    } catch (err) {
+      if (isDuplicateKey(err)) return null;
+      throw err;
+    }
+  }
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return (await Link.create({ ...fields, code: randomCode() })).toObject();
+    } catch (err) {
+      if (!isDuplicateKey(err) || attempt === MAX_CODE_ATTEMPTS) throw err;
+    }
   }
 }
 
-function validateAlias(value: unknown): string | null {
-  if (typeof value !== 'string' || !ALIAS_PATTERN.test(value)) {
-    return 'alias must be 3-30 characters: letters, digits, - or _';
-  }
-  return RESERVED_ALIASES.includes(value.toLowerCase()) ? 'alias is reserved' : null;
+function aliasTaken(res: Response) {
+  res.status(409).json({ error: 'Alias already taken' });
 }
 
-function validateExpiry(value: unknown): string | null {
-  const time = typeof value === 'string' ? Date.parse(value) : NaN;
-  if (Number.isNaN(time)) return 'expiresAt must be an ISO date string';
-  return time > Date.now() ? null : 'expiresAt must be in the future';
-}
-
-function badRequest(res: Response, error: string) {
-  res.status(400).json({ error });
-}
-
-export function linksRouter(writeLimiter: RequestHandler) {
+/** Expects requireAuth to have run (res.locals.userId). */
+export function linksRouter() {
   const router = Router();
-  router.use(requireAuth);
-  // create / edit / delete are rate limited per user; reads are not.
-  router.use((req, res, next) => (req.method === 'GET' ? next() : writeLimiter(req, res, next)));
+
+  // Loads the caller's own link for every /:id route. Another user's link is a 404, so ids can't be probed.
+  router.param('id', async (_req, res, next, id: string) => {
+    try {
+      const link = isValidObjectId(id) ? await Link.findOne({ _id: id, owner: res.locals.userId }).lean() : null;
+      if (!link) return void res.status(404).json({ error: 'Link not found' });
+      res.locals.link = link;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
 
   router.post('/', async (req, res) => {
-    const { url, alias, expiresAt } = req.body ?? {};
-    const error =
-      validateUrl(url) ??
-      (alias !== undefined && alias !== '' ? validateAlias(alias) : null) ??
-      (expiresAt !== undefined && expiresAt !== null ? validateExpiry(expiresAt) : null);
-    if (error) return badRequest(res, error);
+    const parsed = parseLinkInput(req.body, 'create', Date.now());
+    if ('error' in parsed) return void res.status(400).json({ error: parsed.error });
 
-    const link = await Link.create({
-      owner: res.locals.userId,
-      code: alias || randomCode(),
-      url,
-      expiresAt: expiresAt ?? null,
-    });
-    res.status(201).json(serializeLink(link));
+    const link = await insertLink(res.locals.userId, parsed.input);
+    if (!link) return aliasTaken(res);
+    res.status(201).json(toLinkResponse(link, 0));
   });
 
   router.get('/', async (_req, res) => {
-    const links = await Link.find({ owner: res.locals.userId }).sort({ createdAt: -1, _id: -1 }); // _id breaks same-millisecond ties
-    res.json(links.map(serializeLink));
+    const links = await Link.find({ owner: res.locals.userId }).sort({ createdAt: -1, _id: -1 }).lean();
+    const counts = await humanClickCounts(links.map((l) => l._id));
+    res.json(links.map((l) => toLinkResponse(l, counts.get(l._id.toString()) ?? 0)));
   });
 
   router.patch('/:id', async (req, res) => {
-    const link = await findOwnedLink(req.params.id, res.locals.userId);
-    if (!link) return void res.status(404).json({ error: 'Link not found' });
+    const link: LinkRecord = res.locals.link;
+    const parsed = parseLinkInput(req.body, 'update', Date.now());
+    if ('error' in parsed) return void res.status(400).json({ error: parsed.error });
 
-    const { url, alias, expiresAt } = req.body ?? {};
-    const error =
-      (url !== undefined ? validateUrl(url) : null) ??
-      (alias !== undefined ? validateAlias(alias) : null) ??
-      (expiresAt !== undefined && expiresAt !== null ? validateExpiry(expiresAt) : null);
-    if (error) return badRequest(res, error);
-
-    if (url !== undefined) link.url = url;
-    if (alias !== undefined) link.code = alias;
-    if (expiresAt !== undefined) link.expiresAt = expiresAt;
-    await link.save();
-    res.json(serializeLink(link));
+    const { alias, ...rest } = parsed.input;
+    const changes = { ...rest, ...(alias !== undefined ? { code: alias } : {}) };
+    let updated: LinkRecord | null = link;
+    if (Object.keys(changes).length > 0) {
+      try {
+        updated = await Link.findByIdAndUpdate(link._id, { $set: changes }, { new: true, lean: true });
+      } catch (err) {
+        if (isDuplicateKey(err)) return aliasTaken(res);
+        throw err;
+      }
+    }
+    if (!updated) return void res.status(404).json({ error: 'Link not found' }); // deleted meanwhile
+    res.json(toLinkResponse(updated, await clickCountOf(updated._id)));
   });
 
   router.get('/:id/stats', async (req, res) => {
-    const link = await findOwnedLink(req.params.id, res.locals.userId);
-    if (!link) return void res.status(404).json({ error: 'Link not found' });
-    res.json({ link: serializeLink(link), ...(await linkStats(link._id, req.query.bots === 'true')) });
+    const link: LinkRecord = res.locals.link;
+    const today = new Date().toISOString().slice(0, 10);
+    res.json({ link: toLinkSummary(link), ...(await linkStats(link._id, req.query.bots === 'true', today)) });
   });
 
-  router.delete('/:id', async (req, res) => {
-    const link = await findOwnedLink(req.params.id, res.locals.userId);
-    if (!link) return void res.status(404).json({ error: 'Link not found' });
+  router.delete('/:id', async (_req, res) => {
+    const link: LinkRecord = res.locals.link;
+    // Link first, so no new clicks can be recorded for it while its clicks are being deleted.
+    await Link.deleteOne({ _id: link._id });
     await Click.deleteMany({ link: link._id });
-    await link.deleteOne();
     res.status(204).end();
   });
 
   return router;
-}
-
-/** Another user's link is reported as not found, so ids can't be probed. */
-export async function findOwnedLink(id: string, userId: string) {
-  if (!isValidObjectId(id)) return null;
-  return Link.findOne({ _id: id, owner: userId });
 }

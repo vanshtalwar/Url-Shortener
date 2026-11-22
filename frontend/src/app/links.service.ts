@@ -3,43 +3,49 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../environments/environment';
 
-export interface Link {
+interface LinkSummary {
   id: string;
   code: string;
   url: string;
   expiresAt: string | null;
-  clickCount: number;
-  createdAt: string;
+}
+
+export interface Link extends LinkSummary {
+  clickCount: number; // human clicks
 }
 
 export interface LinkInput {
   url?: string;
   alias?: string;
-  expiresAt?: string | null;
+  expiresAt?: string | null; // null removes the expiry
 }
 
-export interface CountItem {
+interface CountItem {
   value: string;
   count: number;
 }
 
 export interface LinkStats {
-  link: Link;
-  includeBots: boolean;
+  link: LinkSummary;
   total: number;
   uniqueVisitors: number;
   botClicks: number;
   clicksPerDay: { date: string; count: number }[];
   referrers: CountItem[];
   browsers: CountItem[];
-  os: CountItem[];
+  operatingSystems: CountItem[];
   devices: CountItem[];
 }
 
-const base = `${environment.apiUrl}/api/links`;
+const linksUrl = `${environment.apiUrl}/api/links`;
 
 export function shortUrl(code: string): string {
   return `${environment.apiUrl}/${code}`;
+}
+
+/** Pure: pass the current time in. */
+export function isExpired(expiresAt: string | null, now: number): boolean {
+  return expiresAt !== null && Date.parse(expiresAt) <= now;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -47,22 +53,22 @@ export class LinksService {
   constructor(private http: HttpClient) {}
 
   list(): Observable<Link[]> {
-    return this.http.get<Link[]>(base);
+    return this.http.get<Link[]>(linksUrl);
   }
 
   create(input: LinkInput): Observable<Link> {
-    return this.http.post<Link>(base, input);
+    return this.http.post<Link>(linksUrl, input);
   }
 
-  update(id: string, input: LinkInput): Observable<Link> {
-    return this.http.patch<Link>(`${base}/${id}`, input);
+  update(id: string, changes: LinkInput): Observable<Link> {
+    return this.http.patch<Link>(`${linksUrl}/${id}`, changes);
   }
 
   stats(id: string, includeBots: boolean): Observable<LinkStats> {
-    return this.http.get<LinkStats>(`${base}/${id}/stats`, { params: { bots: String(includeBots) } });
+    return this.http.get<LinkStats>(`${linksUrl}/${id}/stats`, { params: { bots: String(includeBots) } });
   }
 
   remove(id: string): Observable<void> {
-    return this.http.delete<void>(`${base}/${id}`);
+    return this.http.delete<void>(`${linksUrl}/${id}`);
   }
 }

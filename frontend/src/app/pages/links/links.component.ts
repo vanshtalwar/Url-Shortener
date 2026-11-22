@@ -1,54 +1,37 @@
-import { Component, OnInit } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
-import { toDataURL } from 'qrcode';
-import { Link, LinksService, shortUrl } from '../../links.service';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Link, LinkInput, LinksService, isExpired, shortUrl } from '../../links.service';
+import { errorMessage, fromLocalInput, toLocalInput } from './form-utils';
 
-/** ISO string → value for <input type="datetime-local"> in the user's timezone. */
-function toLocalInput(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
+const COPIED_FEEDBACK_MS = 2000;
 
-/** <input type="datetime-local"> value → ISO string, or null when empty. */
-function fromLocalInput(value: string): string | null {
-  return value ? new Date(value).toISOString() : null;
-}
-
-function errorMessage(err: HttpErrorResponse): string {
-  return err.error?.error ?? 'Something went wrong. Please try again.';
-}
-
+/** The list of my links, with inline editing, copy, QR and delete. */
 @Component({
   selector: 'app-links',
   templateUrl: './links.component.html',
 })
-export class LinksComponent implements OnInit {
+export class LinksComponent implements OnInit, OnDestroy {
   links: Link[] = [];
   loading = true;
   error = '';
-
-  // Create form
-  url = '';
-  alias = '';
-  expiresAt = '';
-  creating = false;
+  now = Date.now(); // refreshed whenever the list changes; used to show "Expired"
 
   // Inline edit (one row at a time)
   editingId: string | null = null;
-  edit = { url: '', alias: '', expiresAt: '' };
+  editForm = { url: '', alias: '', expiresAt: '' };
 
-  // QR panel
-  qr: { code: string; dataUrl: string } | null = null;
+  qrCode: string | null = null;
+  copiedId: string | null = null;
+  private copiedTimer?: ReturnType<typeof setTimeout>;
 
-  shortUrl = shortUrl;
+  readonly shortUrl = shortUrl;
+  readonly isExpired = isExpired;
 
   constructor(private linksService: LinksService) {}
 
   ngOnInit(): void {
     this.linksService.list().subscribe({
       next: (links) => {
-        this.links = links;
+        this.setLinks(links);
         this.loading = false;
       },
       error: (err) => {
@@ -58,47 +41,39 @@ export class LinksComponent implements OnInit {
     });
   }
 
-  isExpired(link: Link): boolean {
-    return link.expiresAt !== null && Date.parse(link.expiresAt) <= Date.now();
+  ngOnDestroy(): void {
+    clearTimeout(this.copiedTimer);
   }
 
-  create(): void {
-    this.error = '';
-    this.creating = true;
-    this.linksService
-      .create({ url: this.url.trim(), alias: this.alias.trim() || undefined, expiresAt: fromLocalInput(this.expiresAt) })
-      .subscribe({
-        next: (link) => {
-          this.links = [link, ...this.links];
-          this.url = this.alias = this.expiresAt = '';
-          this.creating = false;
-        },
-        error: (err) => {
-          this.error = errorMessage(err);
-          this.creating = false;
-        },
-      });
+  trackById(_index: number, link: Link): string {
+    return link.id;
+  }
+
+  onCreated(link: Link): void {
+    this.setLinks([link, ...this.links]);
   }
 
   startEdit(link: Link): void {
     this.editingId = link.id;
-    this.edit = { url: link.url, alias: link.code, expiresAt: toLocalInput(link.expiresAt) };
+    this.editForm = { url: link.url, alias: link.code, expiresAt: toLocalInput(link.expiresAt) };
   }
 
   saveEdit(link: Link): void {
-    const alias = this.edit.alias.trim();
-    if (alias !== link.code && !confirm(`${shortUrl(link.code)} will stop working. Continue?`)) return;
+    const changes = this.changedFields(link);
+    if (Object.keys(changes).length === 0) {
+      this.editingId = null;
+      return;
+    }
+    if (changes.alias !== undefined && !confirm(`${shortUrl(link.code)} will stop working. Continue?`)) return;
 
     this.error = '';
-    this.linksService
-      .update(link.id, { url: this.edit.url.trim(), alias, expiresAt: fromLocalInput(this.edit.expiresAt) })
-      .subscribe({
-        next: (updated) => {
-          this.links = this.links.map((l) => (l.id === updated.id ? updated : l));
-          this.editingId = null;
-        },
-        error: (err) => (this.error = errorMessage(err)),
-      });
+    this.linksService.update(link.id, changes).subscribe({
+      next: (updated) => {
+        this.setLinks(this.links.map((l) => (l.id === updated.id ? updated : l)));
+        this.editingId = null;
+      },
+      error: (err) => (this.error = errorMessage(err)),
+    });
   }
 
   remove(link: Link): void {
@@ -106,18 +81,38 @@ export class LinksComponent implements OnInit {
     this.error = '';
     this.linksService.remove(link.id).subscribe({
       next: () => {
-        this.links = this.links.filter((l) => l.id !== link.id);
-        if (this.qr?.code === link.code) this.qr = null;
+        this.setLinks(this.links.filter((l) => l.id !== link.id));
+        if (this.qrCode === link.code) this.qrCode = null;
       },
       error: (err) => (this.error = errorMessage(err)),
     });
   }
 
   copy(link: Link): void {
-    navigator.clipboard.writeText(shortUrl(link.code));
+    navigator.clipboard.writeText(shortUrl(link.code)).then(
+      () => {
+        this.copiedId = link.id;
+        clearTimeout(this.copiedTimer);
+        this.copiedTimer = setTimeout(() => (this.copiedId = null), COPIED_FEEDBACK_MS);
+      },
+      () => (this.error = 'Could not copy to the clipboard.'),
+    );
   }
 
-  async showQr(link: Link): Promise<void> {
-    this.qr = { code: link.code, dataUrl: await toDataURL(shortUrl(link.code), { width: 256, margin: 2 }) };
+  /** Only what the user actually changed, so untouched fields (e.g. a past expiry) aren't re-validated. */
+  private changedFields(link: Link): LinkInput {
+    const url = this.editForm.url.trim();
+    const alias = this.editForm.alias.trim();
+    const expiryChanged = this.editForm.expiresAt !== toLocalInput(link.expiresAt);
+    return {
+      ...(url !== link.url ? { url } : {}),
+      ...(alias !== link.code ? { alias } : {}),
+      ...(expiryChanged ? { expiresAt: fromLocalInput(this.editForm.expiresAt) } : {}),
+    };
+  }
+
+  private setLinks(links: Link[]): void {
+    this.links = links;
+    this.now = Date.now();
   }
 }

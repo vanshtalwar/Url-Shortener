@@ -28,11 +28,17 @@ export function useTestDb() {
 export const fakeVerifyGoogleToken: VerifyGoogleToken = async (credential) => {
   if (!credential.startsWith('good:')) throw new Error('invalid');
   const name = credential.slice(5);
-  return { sub: `google-${name}`, email: `${name}@example.com`, name };
+  return { sub: `google-${name}`, email: `${name}@example.com` };
 };
 
 export function testApp(options: AppOptions = {}) {
   return createApp({ verifyGoogleToken: fakeVerifyGoogleToken, ...options });
+}
+
+/** Human clicks for one link, as the dashboard list reports them. */
+export async function listedClickCount(app: ReturnType<typeof createApp>, auth: object, code: string) {
+  const res = await request(app).get('/api/links').set(auth as Record<string, string>);
+  return res.body.find((l: { code: string }) => l.code === code)?.clickCount;
 }
 
 /** Logs in via the real auth route and returns the JWT. */

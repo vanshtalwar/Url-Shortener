@@ -141,3 +141,29 @@ describe('DELETE /api/links/:id', () => {
     expect(await Link.countDocuments()).toBe(1);
   });
 });
+
+describe('link edge cases', () => {
+  it('rejects a URL longer than 2048 characters', async () => {
+    const { app, alice } = await setup();
+    const url = `https://example.com/${'a'.repeat(2048)}`;
+    expect((await request(app).post('/api/links').set(alice).send({ url })).status).toBe(400);
+  });
+
+  it('lets you change only the URL of an expired link', async () => {
+    const { app, alice } = await setup();
+    const created = await request(app).post('/api/links').set(alice).send({ url: 'https://a.com', expiresAt: future() });
+    await Link.updateOne({ _id: created.body.id }, { expiresAt: new Date(Date.now() - 1000) });
+    const res = await request(app).patch(`/api/links/${created.body.id}`).set(alice).send({ url: 'https://b.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe('https://b.com');
+  });
+
+  it('treats an empty PATCH as a no-op', async () => {
+    const { app, alice } = await setup();
+    const created = await request(app).post('/api/links').set(alice).send({ url: 'https://a.com', alias: 'same' });
+    const res = await request(app).patch(`/api/links/${created.body.id}`).set(alice).send({});
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(created.body);
+  });
+});
+

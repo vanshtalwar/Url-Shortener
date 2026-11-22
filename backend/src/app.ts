@@ -1,21 +1,23 @@
 import express, { type ErrorRequestHandler } from 'express';
 import cors from 'cors';
 import { config } from './config';
+import { requireAuth } from './middleware/auth';
+import { createLimiters, type RateLimits } from './middleware/rateLimit';
 import { authRouter, verifyGoogleToken, type VerifyGoogleToken } from './routes/auth';
 import { linksRouter } from './routes/links';
 import { redirectRouter } from './routes/redirect';
-import { createLimiters, defaultRateLimits, type RateLimits } from './middleware/rateLimit';
 
 export interface AppOptions {
   verifyGoogleToken?: VerifyGoogleToken;
   rateLimits?: RateLimits;
+  trustProxyHops?: number;
 }
 
 export function createApp(options: AppOptions = {}) {
   const app = express();
 
-  // Render sits behind one proxy; needed so req.ip is the real client IP.
-  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+  app.set('trust proxy', options.trustProxyHops ?? config.trustProxyHops);
   app.use(cors({ origin: config.frontendOrigin }));
   app.use(express.json());
 
@@ -23,9 +25,9 @@ export function createApp(options: AppOptions = {}) {
     res.json({ status: 'ok' });
   });
 
-  const limiters = createLimiters(options.rateLimits ?? defaultRateLimits);
+  const limiters = createLimiters(options.rateLimits ?? config.rateLimits);
   app.use('/api/auth', limiters.login, authRouter(options.verifyGoogleToken ?? verifyGoogleToken));
-  app.use('/api/links', linksRouter(limiters.linkWrites));
+  app.use('/api/links', requireAuth, limiters.linkWrites, linksRouter());
   // Last, so /:code never shadows /health or /api/*.
   app.use(redirectRouter(limiters.redirects));
 
@@ -34,11 +36,6 @@ export function createApp(options: AppOptions = {}) {
 }
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
-  if (err?.code === 11000) {
-    // The only unique fields clients can set are link codes/aliases.
-    res.status(409).json({ error: 'Alias already taken' });
-    return;
-  }
   // body-parser errors (e.g. malformed JSON) carry a 4xx status.
   if (typeof err?.status === 'number' && err.status < 500) {
     res.status(err.status).json({ error: err.message });
