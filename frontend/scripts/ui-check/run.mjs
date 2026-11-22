@@ -81,8 +81,12 @@ for (let i = 0; i < 420; i++) {
 await db.collection('clicks').insertMany(clicks);
 await db.collection('bios').insertOne({ owner, handle: 'priya', title: 'Priya Sharma', description: 'Designer & maker. Shop, newsletter and latest projects.', theme: 'violet',
   links: [{ linkId: ids[0], label: 'Spring sale — 30% off' }, { linkId: ids[1], label: 'Read the newsletter' }, { linkId: ids[3], label: 'New landing page' }], createdAt: new Date(), updatedAt: new Date() });
-const token = jwt.sign({ sub: owner.toString() }, 'ui-check', { expiresIn: '1h' });
-const user = JSON.stringify({ id: owner.toString(), email: 'priya.sharma@example.com' });
+// …and a new Free account with nothing yet: the dashboard's empty states.
+const newcomer = (await db.collection('users').insertOne({ email: 'sam.lee@example.com', emailVerified: true, googleId: 'g2', passwordHash: null, subscription: null,
+  createdAt: new Date(), updatedAt: new Date() })).insertedId;
+const session = (id, email) => ({ token: jwt.sign({ sub: id.toString() }, 'ui-check', { expiresIn: '1h' }), user: JSON.stringify({ id: id.toString(), email }) });
+const sessions = { pro: session(owner, 'priya.sharma@example.com'), new: session(newcomer, 'sam.lee@example.com') };
+const { token, user } = sessions.pro;
 
 // --- static server for the build (SPA fallback), pointing its API URL at the throwaway backend -------
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.md': 'text/markdown', '.map': 'application/json' };
@@ -98,40 +102,60 @@ const web = createHttpServer(async (req, res) => {
 
 // --- render every page at 3 widths -----------------------------------------------------------------
 const guestPages = ['/', '/features', '/pricing', '/about', '/contact', '/blog', '/blog/utm-parameters-explained', '/legal/privacy', '/login', '/signup', '/forgot-password', '/@priya', '/@nobody'];
-const appPages = ['/app', '/app/links', `/app/links/${ids[3]}`, '/app/bio', '/app/billing', '/app/settings'];
+const appPages = ['/app', '/app/links', `/app/links/${ids[3]}`, `/app/links/${ids[5]}`, '/app/bio', '/app/billing', '/app/settings'];
+const newcomerPages = ['/app', '/app/links', '/app/bio']; // the new account's empty states
 // ONLY=paths (STATS = the A/B link's stats page), WIDTH=one width, FULL=1 full-page shots, REDUCED=1 reduced motion.
-const ONLY = process.env.ONLY ? process.env.ONLY.split(',').map((p) => (p === 'STATS' ? `/app/links/${ids[3]}` : p)) : null;
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',').map((p) => (p === 'STATS' ? `/app/links/${ids[3]}` : p === 'NOCLICKS' ? `/app/links/${ids[5]}` : p)) : null;
 const REDUCED = Boolean(process.env.REDUCED);
 const PHONE = Boolean(process.env.PHONE); // emulate an iPhone 13 (390 × 844 at 3×, touch)
 const THROTTLE = Number(process.env.THROTTLE ?? 0); // slow the CPU this many times
 const SLOW = Number(process.env.SLOW ?? 0); // dev builds: burn this many ms per 3D frame (headless frames are hard to slow)
-const FPS = Boolean(process.env.FPS); // sample the landing's frame rate per moment, on the real GPU (macOS Metal)
-const ROUNDS = Number(process.env.ROUNDS ?? 0); // leave the landing for /pricing and come back this many times
+const FPS = Boolean(process.env.FPS); // sample the 3D pages' frame rates per moment, on the real GPU (macOS Metal)
+const ROUNDS = Number(process.env.ROUNDS ?? 0); // leave each 3D page and come back this many times
 // The 3D tier is pinned to keep checks deterministic, except when the tier choice itself is under test.
 const PIN_TIER = FPS ? (PHONE ? 'medium' : 'high') : PHONE || THROTTLE || SLOW ? '' : process.env.XP_TIER ?? 'high';
 const widths = PHONE ? [{ w: 390, h: 844 }] : process.env.WIDTH ? [{ w: Number(process.env.WIDTH), h: 800 }] : ONLY ? [{ w: 360, h: 780 }] : [{ w: 360, h: 780 }, { w: 768, h: 1024 }, { w: 1280, h: 800 }];
 if (!widths.every(({ w }) => Number.isInteger(w) && w > 0)) throw new Error(`WIDTH must be a number of pixels, got "${process.env.WIDTH}"`);
 // Expected here, not bugs: Google Sign-In rejects the checker's origin (only real origins are registered for the
 // client ID), and /@nobody is a deliberate 404.
+// The 3D marketing pages: the whole journey (landing, features) or the link settling above the Pro card (pricing).
+const XP_PAGES = { '/': 'journey', '/features': 'journey', '/pricing': 'pricing' };
+const slug = (path) => path.replace(/[^a-z0-9]+/gi, '') || 'landing';
+// The dashboard's 3D illustrations (<z-scene>) on each page, by account (Phase 3). Checked in the default, REDUCED and
+// SLOW modes; the other modes are about the marketing pages' 3D.
+const SCENES = {
+  pro: { '/app': ['pulse'], [`/app/links/${ids[3]}`]: ['globe'], [`/app/links/${ids[5]}`]: ['qr'] },
+  new: { '/app': ['chain'], '/app/links': ['chain'], '/app/bio': ['stack'] },
+};
+const CHECK_DASHBOARD = !(PHONE || THROTTLE || FPS || ROUNDS);
 const expected = (path, message) => message.includes('[GSI_LOGGER]: The given origin is not allowed') || (path === '/@nobody' && message.includes('status of 404'));
 // Software WebGL (SwiftShader) for repeatable checks; the real GPU (Metal, macOS) to measure frame rates.
-const gpuArgs = FPS ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'];
+const GPU = FPS || Boolean(process.env.GPU); // the real GPU (macOS Metal) rather than the software one
+const gpuArgs = GPU ? ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'];
 const browser = await puppeteer.launch({ executablePath: chromePath, headless: true, args: [...gpuArgs, '--no-first-run', '--js-flags=--expose-gc'] });
 const results = [];
 for (const { w, h } of widths) {
-  const all = [...guestPages.map((p) => [p, false]), ...appPages.map((p) => [p, true])];
-  for (const [path, signedIn] of all.filter(([p]) => !ONLY || ONLY.includes(p))) {
+  const all = [...guestPages.map((p) => [p, null]), ...appPages.map((p) => [p, 'pro']), ...newcomerPages.map((p) => [p, 'new'])];
+  for (const [path, account] of all.filter(([p]) => !ONLY || ONLY.includes(p))) {
     const page = await browser.newPage();
     if (PHONE) await page.emulate(KnownDevices['iPhone 13']);
     else await page.setViewport({ width: w, height: h, deviceScaleFactor: FPS ? 2 : 1 }); // frame rates on a retina-class screen
     if (THROTTLE) await page.emulateCPUThrottling(THROTTLE);
     if (REDUCED) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-    await page.evaluateOnNewDocument((t, u, signed, tier, slow) => {
-      localStorage.clear();
-      if (signed) { localStorage.setItem('token', t); localStorage.setItem('user', u); }
-      // Dev builds: pin the 3D quality tier so a slow software GPU can't swap the live journey for stills mid-check.
-      if (tier) localStorage.setItem('xp-tier', tier);
-      if (slow) localStorage.setItem('xp-slow', String(slow));
+    await page.evaluateOnNewDocument((t, u, tier, slow) => {
+      // Once per tab: a reload keeps what the page saved (the particles switch).
+      if (!sessionStorage.getItem('ui-check')) {
+        sessionStorage.setItem('ui-check', '1');
+        localStorage.clear();
+        if (t) { localStorage.setItem('token', t); localStorage.setItem('user', u); }
+        // Dev builds: pin the 3D quality tier so a slow software GPU can't swap the live journey for stills mid-check.
+        if (tier) localStorage.setItem('xp-tier', tier);
+        if (slow) localStorage.setItem('xp-slow', String(slow));
+      }
+      // Long tasks (the main thread busy > 50 ms), to check the dashboard stays responsive while idle.
+      window.__longTasks = [];
+      new PerformanceObserver((list) => { for (const e of list.getEntries()) window.__longTasks.push({ at: Math.round(e.startTime), ms: Math.round(e.duration) }); })
+        .observe({ type: 'longtask', buffered: true });
       // Count live WebGL contexts (created minus lost), to prove leaving a 3D page frees its context.
       window.__glLive = 0;
       const getContext = HTMLCanvasElement.prototype.getContext;
@@ -149,7 +173,7 @@ for (const { w, h } of widths) {
       const raf = window.requestAnimationFrame.bind(window);
       window.__frames = 0;
       window.requestAnimationFrame = (cb) => { window.__frames++; return raf(cb); };
-    }, token, user, signedIn, PIN_TIER, SLOW);
+    }, sessions[account]?.token, sessions[account]?.user, PIN_TIER, SLOW);
     const errors = [];
     // Warnings too (ours and libraries'), except headless Chrome's software-GL driver notes ("GPU stall due to ReadPixels").
     page.on('console', (m) => {
@@ -158,17 +182,21 @@ for (const { w, h } of widths) {
     page.on('pageerror', (e) => errors.push('PAGEERROR ' + String(e.message).slice(0, 160)));
     page.on('requestfailed', (r) => { if (!r.url().includes('fonts.g') && !r.url().includes('accounts.google')) errors.push('REQFAIL ' + r.url().slice(0, 100)); });
     await page.goto(`http://localhost:${WEB_PORT}${path}`, { waitUntil: 'networkidle0', timeout: 30000 }).catch((e) => errors.push('NAV ' + e.message));
-    const landing = path === '/' ? await checkLanding(page) : null;
-    if (landing && !landing.problem) {
-      if (ROUNDS) landing.rounds = await checkRoundTrips(page, ROUNDS);
-      else if (FPS) landing.frameRate = await checkFrameRate(page, PHONE ? 45 : 55);
-      else if (THROTTLE || SLOW) landing.downgrade = await checkDowngrade(page);
-      else if (PHONE) landing.phone = await checkPhone(page);
+    const kind = XP_PAGES[path];
+    const xp = kind ? await checkExperience(page) : null;
+    if (xp && !xp.problem) {
+      if (ROUNDS) xp.rounds = await checkRoundTrips(page, ROUNDS, path);
+      else if (FPS) xp.frameRate = await checkFrameRate(page, PHONE ? 45 : 55, kind);
+      else if (THROTTLE || SLOW) xp.downgrade = await checkDowngrade(page);
+      else if (PHONE) xp.phone = await checkPhone(page);
       else {
-        landing.sections = await checkLandingSections(page, w);
-        landing.journey = await checkJourney(page, w);
+        if (path === '/' && w >= 1024) xp.cursor = await checkCursor(page, w); // a mouse: desktop widths
+        xp.sections = await checkSections(page, w, path);
+        if (kind === 'journey') xp.journey = await checkJourney(page, w, path);
+        else xp.drop = await checkDrop(page, w);
       }
     }
+    const dash = account && CHECK_DASHBOARD ? await checkDashboard(page, SCENES[account][path] ?? [], w, path, account) : null;
     await new Promise((r) => setTimeout(r, Number(process.env.WAIT ?? 700)));
     const metrics = await page.evaluate(() => {
       const vw = document.documentElement.clientWidth;
@@ -190,62 +218,62 @@ for (const { w, h } of widths) {
         .map(({ el, r }) => `${el.tagName.toLowerCase()}[${String(el.className).slice(0, 60)}] w=${Math.round(r.width)} right=${Math.round(r.right)} "${(el.textContent || '').trim().slice(0, 40)}"`);
       return { smallest, scrollW: document.documentElement.scrollWidth, vw, title: document.title, overflowing: over.slice(0, 4), h1: document.querySelector('h1')?.textContent?.trim().slice(0, 60) ?? null };
     });
-    if (landing?.problem) errors.push('LANDING ' + landing.problem);
-    if (landing?.sections?.problem) errors.push('LANDING SECTIONS ' + landing.sections.problem);
-    if (landing?.journey?.problem) errors.push('LANDING JOURNEY ' + landing.journey.problem);
-    if (landing?.downgrade?.problem) errors.push('LANDING DOWNGRADE ' + landing.downgrade.problem);
-    if (landing?.phone?.problem) errors.push('LANDING PHONE ' + landing.phone.problem);
-    if (landing?.frameRate?.problem) errors.push('LANDING FRAME RATE ' + landing.frameRate.problem);
-    if (landing?.rounds?.problem) errors.push('LANDING ROUND TRIPS ' + landing.rounds.problem);
-    const name = `${w}-${(path.replace(/[^a-z0-9@]+/gi, '_') || 'root').replace(/^_|_$/g, '') || 'home'}${REDUCED ? '-reduced' : ''}.png`;
+    if (xp?.problem) errors.push('3D ' + xp.problem);
+    if (dash?.problem) errors.push('DASHBOARD ' + dash.problem);
+    for (const part of ['cursor', 'sections', 'journey', 'drop', 'downgrade', 'phone', 'frameRate', 'rounds']) {
+      if (xp?.[part]?.problem) errors.push(`3D ${part.toUpperCase()} ${xp[part].problem}`);
+    }
+    const name = `${w}-${(path.replace(/[^a-z0-9@]+/gi, '_') || 'root').replace(/^_|_$/g, '') || 'home'}${account === 'new' ? '-new' : ''}${REDUCED ? '-reduced' : ''}.png`;
     await page.screenshot({ path: join(shotsDir, (process.env.FULL ? 'full-' : '') + name), fullPage: Boolean(process.env.FULL) });
-    results.push({ w, path, signedIn, horizontalScroll: metrics.scrollW > metrics.vw, ...metrics, errors, landing });
+    results.push({ w, path, account, horizontalScroll: metrics.scrollW > metrics.vw, ...metrics, errors, xp, dash });
     await page.close();
   }
 }
 
 /**
- * Landing 3D: the experience chunk replaces the SVG hero after first paint. Live: two fixed canvases (3D + particles).
- * Reduced motion: a still frame inside the hero box, and no animation frames requested once it's drawn.
+ * A 3D page: the experience chunk loads after first paint and draws over the SVG stand-ins. Live: two fixed canvases
+ * (3D + particles). Reduced motion: a still frame in every anchor, and no animation frames once they're drawn.
  */
-async function checkLanding(page) {
-  const drawn = await settle(page.waitForFunction(() => Boolean(document.querySelector('[data-xp-anchor="hero"][data-xp-drawn]')), { timeout: 15000 })).then(() => true, () => false);
-  if (!drawn) return { problem: 'the 3D hero was never drawn over its SVG stand-in' };
+async function checkExperience(page) {
+  const drawn = await settle(page.waitForFunction(() => Boolean(document.querySelector('[data-xp-anchor][data-xp-drawn]')), { timeout: 15000 })).then(() => true, () => false);
+  if (!drawn) return { problem: 'the 3D was never drawn over its SVG stand-ins' };
   const framesBefore = await page.evaluate(() => window.__frames);
   await new Promise((r) => setTimeout(r, 1000));
-  return page.evaluate((reduced, framesBefore) => {
+  // With THROTTLE/SLOW the page may already have switched to stills: checkDowngrade checks that end state.
+  return page.evaluate((reduced, framesBefore, downgrading) => {
     const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? Infinity;
     const chunk = performance.getEntriesByType('resource').find((e) => /experience/.test(e.name));
     const live = [...document.querySelectorAll('canvas')].filter((c) => getComputedStyle(c).position === 'fixed');
-    const still = document.querySelectorAll('[data-xp-anchor="hero"] canvas');
+    const anchors = document.querySelectorAll('[data-xp-anchor]').length;
+    const still = document.querySelectorAll('[data-xp-anchor] > canvas');
     const framesPerSecond = window.__frames - framesBefore;
     const facts = { chunkStartMs: Math.round(chunk?.startTime ?? -1), fcpMs: Math.round(fcp), liveCanvases: live.length, stillCanvases: still.length, framesPerSecond };
     const problem = !chunk ? 'experience chunk not loaded'
       : chunk.startTime < fcp ? 'experience chunk requested before first contentful paint'
-      : reduced && (live.length || still.length !== 1) ? 'reduced motion should show one still canvas in the hero and no live canvas'
+      : reduced && (live.length || still.length !== anchors) ? `reduced motion should draw a still in each of the ${anchors} anchors, and no live canvas`
       : reduced && framesPerSecond > 0 ? `reduced motion still requests animation frames (${framesPerSecond}/s)`
-      : !reduced && (live.length !== 2 || still.length) ? 'expected two live canvases (3D + particles)'
+      : !reduced && !downgrading && (live.length !== 2 || still.length) ? 'expected two live canvases (3D + particles)'
       : null;
     return { ...facts, problem };
-  }, REDUCED, framesBefore);
+  }, REDUCED, framesBefore, Boolean(THROTTLE || SLOW));
 }
 
 /**
- * Scrolls each landing section to the middle of the screen, waits for the palette cross-fade and headline reveal,
+ * Scrolls each section of a 3D page to the middle of the screen, waits for the palette cross-fade and headline reveal,
  * takes a screenshot, and checks that the page shows that section's palette (live: the whole page via <html>;
  * still: the section itself, with the header following) and that its heading is readable on what's behind it.
  */
-async function checkLandingSections(page, width) {
-  const count = await page.evaluate(() => document.querySelectorAll('app-landing section').length);
+async function checkSections(page, width, path) {
+  const count = await page.evaluate(() => document.querySelectorAll('main section').length);
   const report = [];
   for (let i = 0; i < count; i++) {
     await page.evaluate((i) => {
-      const box = document.querySelectorAll('app-landing section')[i].getBoundingClientRect();
+      const box = document.querySelectorAll('main section')[i].getBoundingClientRect();
       window.scrollTo(0, window.scrollY + box.top + Math.min(box.height, innerHeight) / 2 - innerHeight / 2);
     }, i);
     await new Promise((r) => setTimeout(r, 1600));
     const facts = await page.evaluate((i) => {
-      const section = document.querySelectorAll('app-landing section')[i];
+      const section = document.querySelectorAll('main section')[i];
       const own = section.dataset.palette ?? section.dataset.xpPalette ?? null;
       const rgb = (css) => css.match(/[\d.]+/g).slice(0, 3).map(Number);
       const lum = (c) => { const [r, g, b] = c.map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
@@ -271,7 +299,7 @@ async function checkLandingSections(page, width) {
       : null;
     if (problem) report.problem = (report.problem ? report.problem + '; ' : '') + `${facts.section}: ${problem}`;
     report.push(`${facts.section}=${facts.own ?? '-'}${facts.contrast ? ` ${facts.contrast.toFixed(1)}:1` : ''}`);
-    await page.screenshot({ path: join(shotsDir, `${width}-landing-${i + 1}-${facts.section}${REDUCED ? '-reduced' : ''}.png`) });
+    await page.screenshot({ path: join(shotsDir, `${width}-${slug(path)}-${i + 1}-${facts.section}${REDUCED ? '-reduced' : ''}.png`) });
   }
   return report;
 }
@@ -303,18 +331,232 @@ async function shootBox(page, selector, margin = 24) {
 }
 
 /**
+ * A dashboard page (Phase 3): its 3D illustrations (<z-scene>) draw over their fallbacks after first paint — except
+ * the globe with reduced motion, which keeps the 2D map — and really paint something (screenshots
+ * `<width>-<page>-<account>-<kind>.png`); the no-clicks QR code scans to the link; the background particles run behind
+ * the app, except with reduced motion, when nothing requests animation frames. SLOW: the frame-rate guards must end
+ * the same way (stills, the globe back to the map, no particles, no frames). Overview: no long tasks while idle.
+ * Settings: the particles switch. New account's Overview: WebGL contexts freed on navigation.
+ */
+async function checkDashboard(page, kinds, width, path, account) {
+  const still = REDUCED || SLOW;
+  const drawnExpected = still ? kinds.filter((k) => k !== 'globe').length : kinds.length;
+  await settle(page.waitForFunction((n, particles) => document.querySelectorAll('z-scene[data-xp-drawn]').length >= n && (!particles || document.querySelector('app-app-layout > canvas')),
+    { timeout: 15000 }, drawnExpected, !still)).catch(() => undefined);
+  if (SLOW) {
+    // On screen (scenes only animate there), until the guards give up animating (2 s windows), at most 20 s.
+    await page.evaluate(() => document.querySelector('z-scene')?.scrollIntoView({ block: 'center' }));
+    for (let i = 0, last = -1; i < 20; i++) {
+      const frames = await page.evaluate(() => window.__frames);
+      if (frames === last) break;
+      last = frames;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  const framesBefore = await page.evaluate(() => window.__frames);
+  await new Promise((r) => setTimeout(r, 1000));
+  const facts = await page.evaluate((framesBefore) => {
+    const scenes = [...document.querySelectorAll('z-scene')];
+    return {
+      scenes: scenes.length,
+      drawn: scenes.filter((s) => 'xpDrawn' in s.dataset && s.querySelector(':scope > canvas')).length,
+      particles: document.querySelectorAll('app-app-layout > canvas').length,
+      framesPerSecond: window.__frames - framesBefore,
+    };
+  }, framesBefore);
+  let problem = facts.scenes !== kinds.length ? `expected ${kinds.length} 3D illustrations (${kinds.join(', ') || 'none'}), found ${facts.scenes}`
+    : facts.drawn !== drawnExpected ? `${facts.drawn} of ${drawnExpected} 3D illustrations drawn`
+    : still && facts.particles ? `background particles despite ${REDUCED ? 'reduced motion' : 'slow frames'}`
+    : !still && facts.particles !== 1 ? `${facts.particles} background particle canvases, expected 1`
+    : still && facts.framesPerSecond > 0 ? `still requests animation frames (${facts.framesPerSecond}/s)`
+    : null;
+  if (problem) return { ...facts, problem };
+
+  // What's painted in each scene's box (share of pixels unlike its background); the QR code must scan.
+  facts.painted = {};
+  for (const [i, kind] of kinds.entries()) {
+    const drawn = await page.evaluate((i) => {
+      const scene = document.querySelectorAll('z-scene')[i];
+      scene.dataset.check = String(i);
+      scene.scrollIntoView({ block: 'center' });
+      return 'xpDrawn' in scene.dataset;
+    }, i);
+    if (!drawn) continue; // the globe with reduced motion: the map
+    await new Promise((r) => setTimeout(r, 400));
+    const shot = await shootBox(page, `z-scene[data-check="${i}"]`, 0);
+    await writeFile(join(shotsDir, `${width}-${slug(path)}-${account}-${kind}${REDUCED ? '-reduced' : SLOW ? '-slow' : ''}.png`), shot);
+    facts.painted[kind] = Number(coverage(shot).toFixed(3));
+    if (facts.painted[kind] < 0.03) problem = `the ${kind} illustration looks blank (${facts.painted[kind]})`;
+    if (kind === 'qr') {
+      const expected = `http://localhost:${API_PORT}/Ab3xK9q`;
+      for (let attempt = 0; attempt < 5 && facts.qr !== expected; attempt++) {
+        facts.qr = decodeQr(await shootBox(page, `z-scene[data-check="${i}"]`, 24));
+        if (facts.qr !== expected) await new Promise((r) => setTimeout(r, 400));
+      }
+      if (facts.qr !== expected) problem = `the QR code reads ${JSON.stringify(facts.qr)}, expected ${expected}`;
+    }
+  }
+  if (problem) return { ...facts, problem };
+  if (path === '/app' && account === 'pro') facts.idle = await checkIdle(page);
+  if (path === '/app' && account === 'new') facts.rounds = await checkSceneRounds(page);
+  if (path === '/app/settings' && !SLOW) facts.particlesSwitch = await checkParticlesSwitch(page);
+  return { ...facts, problem: facts.idle?.problem ?? facts.rounds?.problem ?? facts.particlesSwitch?.problem ?? null };
+}
+
+/**
+ * New account: Overview → Links → Overview, 3 times, through the sidebar. Each page's scene must free its WebGL
+ * context when the page goes (browsers cap live contexts at ~16): one context, one scene canvas and one particle
+ * canvas at the end.
+ */
+async function checkSceneRounds(page) {
+  const go = async (label, path) => {
+    await page.evaluate((label) => {
+      document.querySelectorAll('z-scene').forEach((scene) => (scene.dataset.old = ''));
+      [...document.querySelectorAll('nav a')].find((a) => a.textContent.trim() === label).click();
+    }, label);
+    await settle(page.waitForFunction((path) => location.pathname === path && document.querySelector('z-scene[data-xp-drawn]:not([data-old])'), { timeout: 15000 }, path));
+  };
+  for (let i = 0; i < 3; i++) {
+    await go('Links', '/app/links');
+    await go('Overview', '/app');
+  }
+  await new Promise((r) => setTimeout(r, 500)); // context-lost events
+  const facts = await page.evaluate(() => ({ contexts: window.__glLive, sceneCanvases: document.querySelectorAll('z-scene canvas').length, particles: document.querySelectorAll('app-app-layout > canvas').length }));
+  const particles = REDUCED || SLOW ? 0 : 1;
+  return { ...facts, problem: facts.contexts !== 1 || facts.sceneCanvases !== 1 || facts.particles !== particles ? `after 3 rounds Overview ↔ Links: ${JSON.stringify(facts)}` : null };
+}
+
+/** Overview, settled (3D drawn, particles running): 5 s without input must bring no long tasks. */
+async function checkIdle(page) {
+  const from = await page.evaluate(() => performance.now());
+  await new Promise((r) => setTimeout(r, 5000));
+  const { idle, before } = await page.evaluate((from) => ({ idle: window.__longTasks.filter((t) => t.at >= from), before: window.__longTasks.filter((t) => t.at < from) }), from);
+  return { longTasks: idle.map((t) => t.ms), startUp: before.map((t) => t.ms), problem: idle.length ? `long tasks while idle on Overview: ${idle.map((t) => `${t.ms} ms`).join(', ')}` : null };
+}
+
+/**
+ * Settings → Appearance → Background particles: on by default; off stops them and is saved; still off after a
+ * reload; on again restarts them. With reduced motion: off, disabled, and no particles.
+ */
+async function checkParticlesSwitch(page) {
+  const find = "[...document.querySelectorAll('button[role=switch]')].find((b) => b.textContent.includes('Background particles'))";
+  const read = () => page.evaluate(`(() => {
+    const b = ${find};
+    return { checked: b?.getAttribute('aria-checked'), disabled: b?.disabled, saved: localStorage.getItem('zelqit-particles'), particles: document.querySelectorAll('app-app-layout > canvas').length };
+  })()`);
+  const steps = { start: await read() };
+  if (REDUCED) {
+    const s = steps.start;
+    return { ...steps, problem: s.checked !== 'false' || !s.disabled || s.particles ? `with reduced motion the switch should be off and disabled, with no particles: ${JSON.stringify(s)}` : null };
+  }
+  await page.evaluate(`${find}.click()`);
+  await new Promise((r) => setTimeout(r, 300));
+  steps.off = await read();
+  await page.reload({ waitUntil: 'networkidle0' });
+  await settle(page.waitForFunction(find, { timeout: 15000 }));
+  await new Promise((r) => setTimeout(r, 2000)); // particles would have started by now
+  steps.reloaded = await read();
+  await page.evaluate(`${find}.click()`);
+  await settle(page.waitForFunction(() => document.querySelector('app-app-layout > canvas'), { timeout: 10000 })).catch(() => undefined);
+  steps.on = await read();
+  const { start, off, reloaded, on } = steps;
+  const problem = start.checked !== 'true' || start.particles !== 1 ? `particles should be on at first: ${JSON.stringify(start)}`
+    : off.checked !== 'false' || off.particles || off.saved !== 'off' ? `switching off should stop the particles and save "off": ${JSON.stringify(off)}`
+    : reloaded.checked !== 'false' || reloaded.particles ? `the switch should stay off after a reload: ${JSON.stringify(reloaded)}`
+    : on.checked !== 'true' || on.particles !== 1 || on.saved !== null ? `switching on should restart the particles and clear "off": ${JSON.stringify(on)}`
+    : null;
+  return { ...steps, problem };
+}
+
+/**
+ * Landing with a mouse: the cursor is a dot in a jiggly ring (the system cursor hidden, but the text cursor in the URL
+ * field, where the ring steps aside; the ring grows over a button) and the hero link turns to face the mouse (dev-only
+ * window.xpFollow, −1…1). Reduced motion: the system cursor and no ring. Screenshots `<width>-cursor-<what>.png`.
+ * Ends with the mouse "out of the window", so later checks see the page without it.
+ */
+async function checkCursor(page, width) {
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  // What's on screen around a point (puppeteer's clip is in document coordinates, and mustn't scroll the page).
+  const shootAround = async (name, x, y, w, h) => {
+    const scrollY = await page.evaluate(() => window.scrollY);
+    await page.screenshot({ path: join(shotsDir, `${width}-cursor-${name}.png`), clip: { x: x - w / 2, y: y - h / 2 + scrollY, width: w, height: h }, captureBeyondViewport: false });
+  };
+  const centre = (selector) => page.evaluate((selector) => {
+    const r = document.querySelector(selector).getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }, selector);
+  const read = () => page.evaluate(() => {
+    const ring = document.querySelector('.xp-cursor-ring');
+    const style = ring && getComputedStyle(ring);
+    return {
+      ring: Boolean(ring),
+      on: document.documentElement.classList.contains('xp-cursor'), // the ring fades to this (0.2 s)
+      opacity: style ? Number(style.opacity) : null,
+      scale: style ? Number(new DOMMatrix(style.transform).a.toFixed(2)) : null, // at rest it isn't turned
+      page: getComputedStyle(document.body).cursor,
+      field: getComputedStyle(document.querySelector('#demo-url')).cursor,
+      follow: window.xpFollow ? Number(window.xpFollow.x.toFixed(2)) : null,
+    };
+  });
+  const hero = await centre('[data-xp-anchor="hero"]');
+  await page.mouse.move(hero.x - 60, hero.y - 40);
+  await page.mouse.move(hero.x, hero.y, { steps: 8 });
+  await pause(800);
+  const steps = { page: await read() };
+  if (REDUCED) {
+    const s = steps.page;
+    return { ...steps, problem: s.ring || s.page !== 'auto' ? `reduced motion should keep the system cursor: ${JSON.stringify(s)}` : null };
+  }
+  const field = await centre('#demo-url');
+  await page.mouse.move(field.x, field.y, { steps: 6 });
+  await pause(400);
+  steps.field = await read();
+  const button = await centre('form[aria-label="Try Zelqit"] button');
+  await page.mouse.move(button.x, button.y, { steps: 6 });
+  await pause(900);
+  steps.button = await read();
+  await shootAround('button', button.x, button.y, 240, 120);
+  for (const [side, x] of [['left', 4], ['right', width - 4]]) {
+    await page.mouse.move(x, hero.y, { steps: 10 });
+    await pause(1500);
+    steps[side] = await read();
+    await page.screenshot({ path: join(shotsDir, `${width}-cursor-hero-${side}.png`) });
+  }
+  // On a cream section too: the ring's rim takes the section's accent.
+  await page.evaluate(() => document.querySelector('[data-xp-section="share"] h2').scrollIntoView({ block: 'center' }));
+  await pause(1600); // the palette cross-fade
+  await page.mouse.move(width * 0.5, 300, { steps: 6 });
+  await pause(800);
+  await shootAround('cream', width * 0.5, 300, 200, 200);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await pause(600);
+  await page.evaluate(() => document.dispatchEvent(new MouseEvent('mouseout', { relatedTarget: null })));
+  await pause(300);
+  steps.out = await read();
+  const { page: p, field: f, button: b, left, right, out } = steps;
+  // Opacities with a margin: the ring fades in and out over 0.2 s.
+  const problem = !p.ring || p.opacity < 0.95 || p.page !== 'none' ? `the dot-in-a-ring cursor should replace the system cursor: ${JSON.stringify(p)}`
+    : f.field !== 'text' || f.opacity > 0.05 ? `the URL field should show the text cursor, not the ring: ${JSON.stringify(f)}`
+    : !(b.scale > 1.4) ? `the ring should grow over a button: ${JSON.stringify(b)}`
+    : !(left.follow < -0.5 && right.follow > 0.5) ? `the hero link should turn to the mouse: left ${left.follow}, right ${right.follow}`
+    : out.on || out.page === 'none' ? `out of the window, the system cursor should be back: ${JSON.stringify(out)}`
+    : null;
+  return { field: f.field, buttonScale: b.scale, follow: [left.follow, right.follow], problem };
+}
+
+/**
  * The 3D journey's moments. Live: scrolls down until each milestone (scroll progress from the dev-only
  * window.xpProgress), screenshots it, and decodes the QR code while it holds at the end of its moment. Reduced
  * motion: decodes the QR code's still frame. Either way the code must scan to this site.
  */
-async function checkJourney(page, width) {
+async function checkJourney(page, width, path) {
   const expected = `http://localhost:${WEB_PORT}/`;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   if (REDUCED) {
     await page.evaluate(() => document.querySelector('[data-xp-anchor="qr"]').scrollIntoView({ block: 'center' }));
     await sleep(400);
     const shot = await shootBox(page, '[data-xp-anchor="qr"]');
-    await writeFile(join(shotsDir, `${width}-qr-still-crop.png`), shot);
+    await writeFile(join(shotsDir, `${width}-${slug(path)}-qr-still-crop.png`), shot);
     const decoded = decodeQr(shot);
     return { qr: decoded, problem: decoded === expected ? null : `QR still decodes to ${JSON.stringify(decoded)}, expected ${expected}` };
   }
@@ -338,10 +580,10 @@ async function checkJourney(page, width) {
     }
     if (y >= total) { missed.push(`${key} ${target}`); continue; }
     await sleep(500);
-    await page.screenshot({ path: join(shotsDir, `${width}-journey-${key}-${target}.png`) });
+    await page.screenshot({ path: join(shotsDir, `${width}-${slug(path)}-journey-${key}-${target}.png`) });
     if (key === 'share' && target === 0.95) {
       const shot = await shootBox(page, '[data-xp-anchor="qr"]');
-      await writeFile(join(shotsDir, `${width}-qr-crop.png`), shot);
+      await writeFile(join(shotsDir, `${width}-${slug(path)}-qr-crop.png`), shot);
       decoded = decodeQr(shot);
     }
   }
@@ -352,20 +594,59 @@ async function checkJourney(page, width) {
   return { qr: decoded, tier, problem };
 }
 
+/** Share of a PNG's pixels that differ clearly from its most common colour (the page behind): something is drawn. */
+function coverage(buffer) {
+  const { data, width, height } = PNG.sync.read(Buffer.from(buffer));
+  const counts = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const top = [...counts].sort((a, b) => b[1] - a[1])[0][0];
+  const background = [(top >> 8) * 16 + 8, ((top >> 4) & 15) * 16 + 8, (top & 15) * 16 + 8];
+  let drawn = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (Math.abs(data[i] - background[0]) + Math.abs(data[i + 1] - background[1]) + Math.abs(data[i + 2] - background[2]) > 60) drawn++;
+  }
+  return drawn / (width * height);
+}
+
+/**
+ * Pricing: the link drops in once its spot above the Pro card is on screen and settles there (live), or is drawn
+ * there as a still (reduced motion). Checked by what's actually painted in that box.
+ */
+async function checkDrop(page, width) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  await page.evaluate(() => document.querySelector('[data-xp-anchor="pricing"]').scrollIntoView({ block: 'center' }));
+  if (!REDUCED) {
+    const landed = await settle(page.waitForFunction(() => (window.xpProgress?.drop ?? 0) >= 1, { timeout: 8000 })).then(() => true, () => false);
+    if (!landed) return { problem: 'the link never finished dropping in' };
+  }
+  await sleep(500);
+  const shot = await shootBox(page, '[data-xp-anchor="pricing"]', 16);
+  await writeFile(join(shotsDir, `${width}-pricing-link${REDUCED ? '-reduced' : ''}.png`), shot);
+  const painted = coverage(shot);
+  return { painted: Number(painted.toFixed(3)), problem: painted < 0.03 ? `almost nothing drawn above the Pro card (${(painted * 100).toFixed(1)} % of the box)` : null };
+}
+
 /**
  * FPS=1: at each moment of the journey, the median frame rate over 90 frames must reach `target` (spec §4.7:
  * 55 desktop, 45 phone tier). Also reports the slowest 10 % of frames. Run on the real GPU (see gpuArgs).
  */
-async function checkFrameRate(page, target) {
+async function checkFrameRate(page, target, kind) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const stops = [['toShare', 0], ['toShare', 0.5], ['share', 0.5], ['know', 0.5], ['toWhere', 1], ['test', 0.5], ['protect', 0.5], ['toPricing', 1], ['toCta', 1]];
+  // Pricing: once the link has landed (drop = 1), at the top and with the comparison table on screen.
+  const stops = kind === 'pricing' ? [['drop', 1], ['table', 0]]
+    : [['toShare', 0], ['toShare', 0.5], ['share', 0.5], ['know', 0.5], ['toWhere', 1], ['test', 0.5], ['protect', 0.5], ['toPricing', 1], ['toCta', 1]];
   await page.evaluate(() => window.scrollTo(0, 0));
   await sleep(600);
   const total = await page.evaluate(() => document.documentElement.scrollHeight);
   const samples = [];
   let y = 0;
   for (const [key, at] of stops) {
-    while (y < total && (await page.evaluate((key) => window.xpProgress?.[key] ?? -1, key)) < at - 1e-6) {
+    if (key === 'table') await page.evaluate(() => document.querySelector('table').scrollIntoView({ block: 'center' }));
+    else if (key === 'drop') await settle(page.waitForFunction(() => (window.xpProgress?.drop ?? 0) >= 1, { timeout: 8000 })).catch(() => undefined);
+    else while (y < total && (await page.evaluate((key) => window.xpProgress?.[key] ?? -1, key)) < at - 1e-6) {
       y += 24;
       await page.evaluate((y) => window.scrollTo(0, y), y);
       await sleep(8);
@@ -389,10 +670,10 @@ async function checkFrameRate(page, target) {
 }
 
 /**
- * ROUNDS=n: go to /pricing and back n times with the site's own links. Away, nothing of the 3D may remain (canvases,
+ * ROUNDS=n: go to /about and back n times with the site's own links. Away, nothing of the 3D may remain (canvases,
  * WebGL contexts, pins, Lenis) and no animation frames may run; back, exactly one context. Reports the JS heap too.
  */
-async function checkRoundTrips(page, rounds) {
+async function checkRoundTrips(page, rounds, path) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const state = () => page.evaluate(() => ({
     canvases: document.querySelectorAll('canvas').length,
@@ -406,8 +687,8 @@ async function checkRoundTrips(page, rounds) {
   let away = null;
   let back = null;
   for (let i = 1; i <= rounds; i++) {
-    await page.click('footer a[href="/pricing"]');
-    await settle(page.waitForSelector('app-pricing'));
+    await page.click('footer a[href="/about"]');
+    await settle(page.waitForSelector('app-about'));
     await sleep(400);
     away = await state();
     if (away.canvases || away.contexts || away.pins || away.lenis) problems.push(`round ${i} away: ${JSON.stringify(away)}`);
@@ -416,10 +697,10 @@ async function checkRoundTrips(page, rounds) {
       const before = await page.evaluate(() => window.__frames);
       await sleep(1000);
       const frames = (await page.evaluate(() => window.__frames)) - before;
-      if (frames) problems.push(`${frames} animation frames/s on /pricing after leaving`);
+      if (frames) problems.push(`${frames} animation frames/s on /about after leaving`);
     }
-    await page.click('a[aria-label="Zelqit home"]');
-    await settle(page.waitForFunction(() => Boolean(document.querySelector('[data-xp-anchor="hero"][data-xp-drawn]')), { timeout: 15000 }));
+    await page.click(path === '/' ? 'a[aria-label="Zelqit home"]' : `footer a[href="${path}"]`);
+    await settle(page.waitForFunction(() => Boolean(document.querySelector('[data-xp-anchor][data-xp-drawn]')), { timeout: 15000 }));
     back = await state();
     if (back.contexts !== 1) problems.push(`round ${i} back: ${back.contexts} WebGL contexts`);
     heaps.push(await heap());
@@ -446,7 +727,7 @@ async function checkDowngrade(page) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const read = () => page.evaluate(() => window.xpTier?.() ?? null);
   const start = await read();
-  const seen = [start];
+  const seen = start === 'still' ? ['live', start] : [start]; // a fast page can switch before we look
   const deadline = Date.now() + 20000;
   while (Date.now() < deadline && seen[seen.length - 1] !== 'still') {
     await page.evaluate(() => window.scrollBy(0, 60));
@@ -462,9 +743,9 @@ async function checkDowngrade(page) {
     await sleep(1000);
     const frames = (await page.evaluate(() => window.__frames)) - before;
     const live = await page.evaluate(() => [...document.querySelectorAll('canvas')].filter((c) => getComputedStyle(c).position === 'fixed').length);
-    const stills = await page.evaluate(() => document.querySelectorAll('[data-xp-anchor] > canvas').length);
+    const [stills, anchors] = await page.evaluate(() => [document.querySelectorAll('[data-xp-anchor] > canvas').length, document.querySelectorAll('[data-xp-anchor]').length]);
     Object.assign(result, { framesPerSecondAfter: frames, liveCanvases: live, stillCanvases: stills });
-    if (live || stills !== 8 || frames > 0) return { ...result, problem: `after switching to stills: ${live} live canvases, ${stills} stills, ${frames} frames/s` };
+    if (live || stills !== anchors || frames > 0) return { ...result, problem: `after switching to stills: ${live} live canvases, ${stills} stills, ${frames} frames/s` };
   }
   return { ...result, problem: null };
 }
@@ -529,10 +810,14 @@ for (const r of problems) {
   console.log(`${r.w}px ${r.path} scroll=${r.horizontalScroll} (${r.scrollW}/${r.vw}) over=${JSON.stringify(r.overflowing)} errors=${JSON.stringify(r.errors)}`);
   if (ONLY) console.log('  smallest culprits:\n    ' + r.smallest.join('\n    '));
 }
-for (const r of results.filter((r) => r.landing)) {
-  const { sections, journey, downgrade, phone, frameRate, rounds, ...facts } = r.landing;
+for (const r of results.filter((r) => r.xp)) {
+  const { cursor, sections, journey, drop, downgrade, phone, frameRate, rounds, ...facts } = r.xp;
   const mode = [REDUCED && 'reduced motion', PHONE && 'phone', THROTTLE && `CPU ÷${THROTTLE}`, SLOW && `+${SLOW} ms/frame`, FPS && 'real GPU'].filter(Boolean).join(', ');
-  console.log(`landing ${r.w}px${mode ? ` (${mode})` : ''}: ${JSON.stringify(facts)}${sections ? `\n  sections: ${sections.join(' · ')}` : ''}${journey ? `\n  journey: QR → ${JSON.stringify(journey.qr)}${journey.tier ? ` · tier ${journey.tier}` : ''}` : ''}${downgrade ? `\n  downgrade: ${JSON.stringify(downgrade)}` : ''}${phone ? `\n  phone: ${JSON.stringify(phone)}` : ''}${frameRate ? `\n  frame rate (tier ${frameRate.tier}):\n    ${frameRate.samples.join('\n    ')}` : ''}${rounds ? `\n  round trips: ${JSON.stringify(rounds)}` : ''}`);
+  console.log(`3D ${r.path} ${r.w}px${mode ? ` (${mode})` : ''}: ${JSON.stringify(facts)}${cursor ? `\n  cursor: ${JSON.stringify(cursor)}` : ''}${sections ? `\n  sections: ${sections.join(' · ')}` : ''}${drop ? `\n  pricing link: ${JSON.stringify(drop)}` : ''}${journey ? `\n  journey: QR → ${JSON.stringify(journey.qr)}${journey.tier ? ` · tier ${journey.tier}` : ''}` : ''}${downgrade ? `\n  downgrade: ${JSON.stringify(downgrade)}` : ''}${phone ? `\n  phone: ${JSON.stringify(phone)}` : ''}${frameRate ? `\n  frame rate (tier ${frameRate.tier}):\n    ${frameRate.samples.join('\n    ')}` : ''}${rounds ? `\n  round trips: ${JSON.stringify(rounds)}` : ''}`);
+}
+for (const r of results.filter((r) => r.dash)) {
+  const { problem, ...facts } = r.dash;
+  console.log(`DASHBOARD ${r.path}${r.account === 'new' ? ' (new account)' : ''} ${r.w}px${REDUCED ? ' (reduced motion)' : SLOW ? ` (+${SLOW} ms/frame)` : ''}: ${JSON.stringify(facts)}`);
 }
 console.log('titles/h1 sample:', results.filter((r) => r.w === widths[widths.length - 1].w).map((r) => `${r.path} → ${r.h1}`).join(' | '));
 if (/error/i.test(apiLog)) console.log('API LOG:', apiLog.slice(0, 800));
