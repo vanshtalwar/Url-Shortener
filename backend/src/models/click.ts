@@ -9,6 +9,9 @@ const clickSchema = new Schema({
   deviceType: { type: String, default: 'unknown' },
   isBot: { type: Boolean, default: false },
   visitorHash: { type: String, required: true }, // sha256(salt + ip + user-agent); raw IP never stored
+  variantUrl: { type: String, default: null }, // A/B destination served; null for single-destination links
+  country: { type: String, default: 'Unknown' }, // ISO code from GeoLite2
+  city: { type: String, default: 'Unknown' },
 });
 // Every click query filters by link, and almost all by isBot too.
 clickSchema.index({ link: 1, isBot: 1 });

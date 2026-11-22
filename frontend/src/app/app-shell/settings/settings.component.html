@@ -1,0 +1,64 @@
+<h1 class="text-2xl font-bold">Settings</h1>
+
+<div *ngIf="!(me.me$ | async)" class="mt-6 h-64 animate-pulse rounded-2xl bg-surface-2" aria-busy="true"></div>
+
+<ng-container *ngIf="me.me$ | async as me">
+  <z-card class="mt-6">
+    <h2 class="text-base font-semibold">Account</h2>
+    <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-[160px_1fr]">
+      <dt class="text-muted">Email</dt>
+      <dd class="break-all">{{ me.user.email }} <z-badge *ngIf="me.user.emailVerified" tone="success">Verified</z-badge></dd>
+      <dt class="text-muted">Sign-in methods</dt>
+      <dd class="flex flex-wrap gap-1.5">
+        <z-badge *ngIf="me.user.hasGoogle">Google</z-badge>
+        <z-badge *ngIf="me.user.hasPassword">Email + password</z-badge>
+      </dd>
+    </dl>
+  </z-card>
+
+  <z-card class="mt-4">
+    <h2 class="text-base font-semibold">{{ me.user.hasPassword ? 'Change password' : 'Set a password' }}</h2>
+    <p *ngIf="!me.user.hasPassword" class="mt-1 text-sm text-muted">Add a password to log in with your email as well as Google.</p>
+    <form class="mt-4 max-w-sm space-y-3" (ngSubmit)="savePassword(me.user.hasPassword)">
+      <div *ngIf="me.user.hasPassword">
+        <label for="current" class="mb-1.5 block text-sm font-medium">Current password</label>
+        <input id="current" name="current" type="password" zInput autocomplete="current-password" [(ngModel)]="current" />
+      </div>
+      <div>
+        <label for="next" class="mb-1.5 block text-sm font-medium">New password</label>
+        <input id="next" name="next" type="password" zInput autocomplete="new-password" [(ngModel)]="next" />
+        <p class="mt-1.5 text-xs text-muted">At least {{ minPassword }} characters.</p>
+      </div>
+      <div>
+        <label for="confirm" class="mb-1.5 block text-sm font-medium">Confirm new password</label>
+        <input id="confirm" name="confirm" type="password" zInput autocomplete="new-password" [(ngModel)]="confirm" />
+        <p *ngIf="confirm && confirm !== next" class="mt-1.5 text-xs text-warning">Passwords don't match.</p>
+      </div>
+      <p *ngIf="error" role="alert" class="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+      <button zButton type="submit" [loading]="saving"
+              [disabled]="next.length < minPassword || next !== confirm || (me.user.hasPassword && !current)">Save password</button>
+    </form>
+  </z-card>
+
+  <z-card class="mt-4">
+    <h2 class="text-base font-semibold" id="theme-heading">Appearance</h2>
+    <div class="mt-3 inline-flex rounded-xl border border-line bg-surface p-1" role="radiogroup" aria-labelledby="theme-heading">
+      <button *ngFor="let t of themes" type="button" role="radio" [attr.aria-checked]="(theme.preference$ | async) === t.id" (click)="theme.set(t.id)"
+              class="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+              [ngClass]="(theme.preference$ | async) === t.id ? 'bg-brand text-white' : 'text-muted hover:text-ink'">{{ t.label }}</button>
+    </div>
+    <div class="mt-4">
+      <z-switch label="Background particles" [checked]="(particles.on$ | async) ?? false" [disabled]="(particles.reducedMotion$ | async) ?? false"
+                (checkedChange)="particles.set($event)"></z-switch>
+      <p class="mt-1.5 text-xs text-muted">{{ (particles.reducedMotion$ | async) ? 'Off while your device is set to reduce motion.' : 'Saved on this device.' }}</p>
+    </div>
+  </z-card>
+
+  <z-card class="mt-4">
+    <h2 class="text-base font-semibold">Delete account</h2>
+    <p class="mt-1 text-sm text-muted">
+      To delete your account and all your links and analytics, email <a [href]="'mailto:' + supportEmail" class="text-accent underline">{{ supportEmail }}</a>
+      from {{ me.user.email }}. Cancel any Pro subscription first.
+    </p>
+  </z-card>
+</ng-container>

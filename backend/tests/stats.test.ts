@@ -36,6 +36,7 @@ describe('GET /api/links/:id/stats', () => {
       total: 4,
       uniqueVisitors: 3,
       botClicks: 1,
+      historyLimited: false,
       clicksPerDay: [
         { date: dateStr(2), count: 2 },
         { date: dateStr(1), count: 0 },
@@ -58,6 +59,9 @@ describe('GET /api/links/:id/stats', () => {
         { value: 'desktop', count: 3 },
         { value: 'mobile', count: 1 },
       ],
+      variants: null,
+      countries: null, // Free plan
+      cities: null,
     });
   });
 

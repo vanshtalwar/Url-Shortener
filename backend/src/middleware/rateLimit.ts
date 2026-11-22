@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 
 interface Limit {
   readonly limit: number;
@@ -10,6 +10,7 @@ export interface RateLimits {
   readonly login: Limit; // per IP
   readonly linkWrites: Limit; // per user: create / edit / delete
   readonly redirects: Limit; // per IP
+  readonly unlocks: Limit; // password guesses per IP per protected link
 }
 
 const message = { error: 'Too many requests, please try again later' };
@@ -27,5 +28,10 @@ export function createLimiters(limits: RateLimits) {
     login: rateLimit({ ...limits.login, message }),
     linkWrites: rateLimit({ ...limits.linkWrites, message, keyGenerator: userKey, skip: (req) => req.method === 'GET' }),
     redirects: rateLimit({ ...limits.redirects, message }),
+    unlocks: rateLimit({
+      ...limits.unlocks,
+      message: 'Too many password attempts. Try again later.',
+      keyGenerator: (req) => `${ipKeyGenerator(req.ip ?? '')}|${req.params.code}`,
+    }),
   };
 }

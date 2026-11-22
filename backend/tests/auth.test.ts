@@ -11,14 +11,15 @@ describe('POST /api/auth/google', () => {
     const res = await request(testApp()).post('/api/auth/google').send({ credential: 'good:alice' });
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
-    expect(res.body.user).toEqual({ id: expect.any(String), email: 'alice@example.com' });
+    expect(res.body.me.user).toMatchObject({ email: 'alice@example.com', emailVerified: true, hasGoogle: true, hasPassword: false });
+    expect(res.body.me.plan).toBe('free');
   });
 
   it('creates the user only once across repeated logins', async () => {
     const app = testApp();
     const first = await request(app).post('/api/auth/google').send({ credential: 'good:alice' });
     const second = await request(app).post('/api/auth/google').send({ credential: 'good:alice' });
-    expect(second.body.user.id).toBe(first.body.user.id);
+    expect(second.body.me.user.id).toBe(first.body.me.user.id);
     expect(await User.countDocuments()).toBe(1);
   });
 
@@ -52,6 +53,6 @@ describe('requireAuth', () => {
     const login = await request(testApp()).post('/api/auth/google').send({ credential: 'good:bob' });
     const res = await request(app).get('/protected').set('Authorization', `Bearer ${login.body.token}`);
     expect(res.status).toBe(200);
-    expect(res.body.userId).toBe(login.body.user.id);
+    expect(res.body.userId).toBe(login.body.me.user.id);
   });
 });

@@ -1,0 +1,132 @@
+<z-drawer [label]="title" (closed)="closed.emit()">
+  <form id="link-editor" class="space-y-6" (ngSubmit)="save()">
+    <!-- Destination -->
+    <div>
+      <label for="url" class="mb-1.5 block text-sm font-medium">Destination URL</label>
+      <input id="url" name="url" type="url" zInput required placeholder="https://example.com/long/page" [(ngModel)]="form.base" [disabled]="form.split" />
+      <p *ngIf="form.split" class="mt-1.5 text-xs text-muted">With an A/B split on, visitors go to the destinations below instead.</p>
+    </div>
+
+    <!-- Alias -->
+    <div>
+      <label for="alias" class="mb-1.5 block text-sm font-medium">Alias <span class="font-normal text-muted">(optional)</span></label>
+      <input id="alias" name="alias" zInput placeholder="spring-sale" [(ngModel)]="form.alias" aria-describedby="alias-help" />
+      <p id="alias-help" class="mt-1.5 text-xs" [class.text-muted]="!aliasError" [class.text-danger]="aliasError">
+        {{ aliasError || '3–30 letters, digits, - or _. Leave empty for a random code.' }}
+      </p>
+      <p *ngIf="aliasChanged" class="mt-1.5 rounded-lg bg-warning/10 px-2 py-1 text-xs text-warning">
+        {{ shortUrl(link!.code) }} will stop working once you save.
+      </p>
+    </div>
+
+    <!-- Expiry + password -->
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label for="expires" class="mb-1.5 block text-sm font-medium">Expires <span class="font-normal text-muted">(optional)</span></label>
+        <div class="flex gap-2">
+          <input id="expires" name="expiresAt" type="datetime-local" zInput [(ngModel)]="form.expiresAt" />
+          <button *ngIf="form.expiresAt" type="button" zButton variant="ghost" size="sm" class="!h-auto !px-2" aria-label="Remove expiry" (click)="form.expiresAt = ''">
+            <z-icon name="x" [size]="16"></z-icon>
+          </button>
+        </div>
+      </div>
+      <div>
+        <label for="password" class="mb-1.5 block text-sm font-medium">Password <span class="font-normal text-muted">(optional)</span></label>
+        <ng-container *ngIf="link?.hasPassword && !changingPassword; else passwordField">
+          <div class="flex items-center gap-2">
+            <z-badge tone="success"><z-icon name="lock" [size]="12"></z-icon>{{ form.removePassword ? 'Will be removed' : 'Password set' }}</z-badge>
+            <button type="button" class="text-xs text-accent hover:underline" (click)="changingPassword = true; form.removePassword = false">Change</button>
+            <button type="button" class="text-xs text-danger hover:underline" (click)="form.removePassword = !form.removePassword">
+              {{ form.removePassword ? 'Keep' : 'Remove' }}
+            </button>
+          </div>
+        </ng-container>
+        <ng-template #passwordField>
+          <input id="password" name="password" type="password" zInput autocomplete="new-password" minlength="4" placeholder="At least 4 characters" [(ngModel)]="form.password" />
+        </ng-template>
+      </div>
+    </div>
+
+    <!-- UTM builder (Pro) -->
+    <fieldset class="rounded-2xl border border-line p-4" [disabled]="!can.utm">
+      <legend class="flex items-center gap-2 px-1 text-sm font-semibold">UTM builder <z-badge *ngIf="!can.utm" tone="pro" [locked]="true">Pro</z-badge></legend>
+      <div *ngIf="can.utm && presets.length" class="mb-3">
+        <label for="preset" class="mb-1.5 block text-xs text-muted">Apply a saved preset</label>
+        <select id="preset" zInput (change)="applyPreset($any($event.target).value)">
+          <option value="">Choose…</option>
+          <option *ngFor="let p of presets" [value]="p.id">{{ p.name }}</option>
+        </select>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div *ngFor="let key of utmKeys">
+          <label [for]="'utm-' + key" class="mb-1 block text-xs text-muted">{{ utmLabel(key) }}</label>
+          <input [id]="'utm-' + key" [name]="'utm-' + key" zInput [placeholder]="key === 'source' ? 'newsletter' : key === 'medium' ? 'email' : key === 'campaign' ? 'spring_sale' : ''"
+                 [(ngModel)]="form.utm[key]" />
+        </div>
+      </div>
+      <div *ngIf="can.utm" class="mt-3">
+        <p class="text-xs text-muted">Final URL</p>
+        <p class="mt-0.5 break-all font-mono text-xs">{{ finalUrl || '—' }}</p>
+        <div class="mt-3 flex gap-2">
+          <input name="presetName" zInput class="!py-1.5" placeholder="Save these values as…" [(ngModel)]="presetName" aria-label="Preset name" />
+          <button type="button" zButton variant="secondary" size="sm" [disabled]="!presetName.trim()" (click)="savePreset()">Save preset</button>
+        </div>
+      </div>
+      <p *ngIf="!can.utm" class="mt-3 text-xs text-muted">Upgrade to tag links for campaign tracking and save presets.</p>
+    </fieldset>
+
+    <!-- A/B split (Pro; read-only after a downgrade) -->
+    <fieldset class="rounded-2xl border border-line p-4" [disabled]="variantsReadOnly">
+      <legend class="flex items-center gap-2 px-1 text-sm font-semibold">A/B destination split <z-badge *ngIf="!can.variants" tone="pro" [locked]="true">Pro</z-badge></legend>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="split" class="h-4 w-4 accent-[rgb(var(--brand-from))]" [ngModel]="form.split" (ngModelChange)="toggleSplit($event)" />
+        Split traffic between 2–{{ maxVariants }} destinations
+      </label>
+      <div *ngIf="form.split" class="mt-4 space-y-4">
+        <div *ngFor="let v of form.variants; let i = index; trackBy: trackByIndex" class="rounded-xl bg-surface-2 p-3">
+          <div class="flex items-center gap-2">
+            <span class="w-6 text-xs font-semibold text-muted">{{ 'ABCDE'[i] }}</span>
+            <input [name]="'variant-url-' + i" type="url" zInput class="!bg-surface" placeholder="https://…" [(ngModel)]="v.url" [attr.aria-label]="'Destination ' + 'ABCDE'[i]" />
+            <button *ngIf="form.variants.length > 2" type="button" zButton variant="ghost" size="sm" class="!px-2" [attr.aria-label]="'Remove destination ' + 'ABCDE'[i]" (click)="removeVariant(i)">
+              <z-icon name="trash" [size]="16"></z-icon>
+            </button>
+          </div>
+          <div class="mt-2 flex items-center gap-3 pl-8">
+            <input type="range" min="1" max="99" class="flex-1 accent-[rgb(var(--brand-from))]" [name]="'variant-weight-' + i" [ngModel]="v.weight"
+                   (ngModelChange)="setWeight(i, $event)" [attr.aria-label]="'Share for destination ' + 'ABCDE'[i]" />
+            <span class="w-10 text-right text-sm tabular-nums">{{ v.weight }}%</span>
+          </div>
+        </div>
+        <button *ngIf="form.variants.length < maxVariants && !variantsReadOnly" type="button" zButton variant="secondary" size="sm" (click)="addVariant()">
+          <z-icon name="plus" [size]="14"></z-icon>Add destination
+        </button>
+      </div>
+      <p *ngIf="variantsReadOnly && form.split" class="mt-3 text-xs text-muted">This split keeps running. Upgrade to change it.</p>
+    </fieldset>
+
+    <!-- Folder & tags (Pro) -->
+    <fieldset class="rounded-2xl border border-line p-4" [disabled]="!can.folders">
+      <legend class="flex items-center gap-2 px-1 text-sm font-semibold">Organise <z-badge *ngIf="!can.folders" tone="pro" [locked]="true">Pro</z-badge></legend>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label for="folder" class="mb-1 block text-xs text-muted">Folder</label>
+          <select id="folder" name="folderId" zInput [(ngModel)]="form.folderId">
+            <option value="">No folder</option>
+            <option *ngFor="let f of folders" [value]="f.id">{{ f.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label for="tags" class="mb-1 block text-xs text-muted">Tags</label>
+          <app-tag-input inputId="tags" [tags]="form.tags" (tagsChange)="form.tags = $event" [disabled]="!can.folders"></app-tag-input>
+        </div>
+      </div>
+    </fieldset>
+
+    <p *ngIf="error" role="alert" class="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+  </form>
+
+  <div drawerFooter class="flex justify-end gap-2">
+    <button type="button" zButton variant="ghost" (click)="closed.emit()">Cancel</button>
+    <button type="submit" form="link-editor" zButton [loading]="saving" [disabled]="!form.split && !form.base.trim()">{{ link ? 'Save changes' : 'Create link' }}</button>
+  </div>
+</z-drawer>

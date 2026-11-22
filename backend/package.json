@@ -1,5 +1,5 @@
 {
-  "name": "url-shortener-backend",
+  "name": "zelqit-backend",
   "version": "1.0.0",
   "directories": {
     "test": "tests"
@@ -9,9 +9,11 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc",
-    "test": "jest"
+    "test": "jest",
+    "postbuild": "sh scripts/download-geoip.sh"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
@@ -19,15 +21,20 @@
     "google-auth-library": "^11.3.4",
     "isbot": "^5.2.3",
     "jsonwebtoken": "^9.0.3",
+    "maxmind": "^5.1.0",
     "mongoose": "^8.24.10",
+    "nodemailer": "^10.6.1",
+    "razorpay": "^2.9.8",
     "ua-parser-js": "^1.0.41"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jest": "^29.5.14",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
+    "@types/nodemailer": "^8.0.2",
     "@types/supertest": "^7.2.1",
     "@types/ua-parser-js": "^0.7.39",
     "jest": "^29.7.0",

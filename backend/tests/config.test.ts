@@ -6,6 +6,13 @@ const base = {
   JWT_SECRET: 'j',
   GOOGLE_CLIENT_ID: 'g',
   VISITOR_HASH_SALT: 's',
+  SMTP_USER: 'u@example.com',
+  SMTP_PASS: 'p',
+  RAZORPAY_KEY_ID: 'k',
+  RAZORPAY_KEY_SECRET: 'ks',
+  RAZORPAY_WEBHOOK_SECRET: 'ws',
+  RAZORPAY_PLAN_MONTHLY: 'pm',
+  RAZORPAY_PLAN_YEARLY: 'py',
 };
 
 describe('loadConfig', () => {
@@ -21,7 +28,7 @@ describe('loadConfig', () => {
     expect(config.rateLimits.redirects.limit).toBe(500);
   });
 
-  it.each(['FRONTEND_ORIGIN', 'MONGODB_URI', 'JWT_SECRET', 'GOOGLE_CLIENT_ID', 'VISITOR_HASH_SALT'])(
+  it.each(['FRONTEND_ORIGIN', 'MONGODB_URI', 'JWT_SECRET', 'GOOGLE_CLIENT_ID', 'VISITOR_HASH_SALT', 'SMTP_USER', 'SMTP_PASS', 'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET', 'RAZORPAY_PLAN_MONTHLY', 'RAZORPAY_PLAN_YEARLY'])(
     'fails at startup when %s is missing',
     (name) => {
       expect(() => loadConfig({ ...base, [name]: undefined })).toThrow(name);
@@ -39,5 +46,6 @@ describe('loadConfig', () => {
     const config = loadConfig(base);
     expect(Object.isFrozen(config)).toBe(true);
     expect(Object.isFrozen(config.rateLimits)).toBe(true);
+    expect(Object.isFrozen(config.razorpay)).toBe(true);
   });
 });

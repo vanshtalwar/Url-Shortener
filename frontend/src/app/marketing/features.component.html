@@ -1,0 +1,104 @@
+<!--
+  Features (prompts/zelqit-frontend.md §4, X7): one section per feature group, each showing its moment of the 3D
+  journey as it scrolls in — the landing's moments in the same order, with shorter pins. Section colours come from
+  data-palette (styles.css); the 3D draws into the data-xp-anchor boxes, over their <app-stand-in> SVGs.
+-->
+
+<!-- Short links: the hero chain -->
+<section data-palette="hero" class="relative overflow-hidden" aria-labelledby="features-title">
+  <div class="pointer-events-none absolute inset-x-0 -top-40 mx-auto h-[560px] max-w-4xl rounded-full bg-brand opacity-[0.18] blur-3xl" aria-hidden="true"></div>
+  <div class="relative mx-auto max-w-6xl px-4 pb-24 pt-16 lg:pb-32 lg:pt-24">
+    <h1 id="features-title" class="xp-headline max-w-3xl text-5xl sm:text-6xl lg:text-7xl">Everything Zelqit <em class="xp-accent">does</em></h1>
+    <p class="mt-5 max-w-2xl text-lg text-muted">Short links, the analytics behind them, and the tools to organise and test your campaigns.</p>
+    <div class="mt-14 grid items-center gap-12 lg:grid-cols-2">
+      <app-feature-copy [group]="groups.links"></app-feature-copy>
+      <div data-xp-anchor="hero" class="relative h-[320px] sm:h-[420px] lg:h-[520px]" aria-hidden="true">
+        <app-stand-in moment="hero"></app-stand-in>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QR codes -->
+<section data-palette="share" data-xp-section="share" class="relative" aria-labelledby="qr-title">
+  <div class="mx-auto grid max-w-6xl items-center gap-12 px-4 py-24 lg:grid-cols-2 lg:py-32">
+    <div data-xp-anchor="qr" class="relative mx-auto aspect-square w-full max-w-[400px]" aria-hidden="true">
+      <app-stand-in moment="qr"></app-stand-in>
+    </div>
+    <app-feature-copy [group]="groups.qr"></app-feature-copy>
+  </div>
+</section>
+
+<!-- Click analytics: the bar chart -->
+<section data-palette="data" data-xp-section="know" class="relative" aria-labelledby="analytics-title">
+  <div class="mx-auto grid max-w-6xl items-center gap-12 px-4 py-24 lg:grid-cols-2 lg:py-32">
+    <app-feature-copy [group]="groups.analytics"></app-feature-copy>
+    <div data-xp-anchor="bars" class="relative mx-auto aspect-[4/3] w-full max-w-[480px]" aria-hidden="true">
+      <app-stand-in moment="bars"></app-stand-in>
+    </div>
+  </div>
+</section>
+
+<!-- Country & city analytics: the globe -->
+<section data-palette="globe" data-xp-section="where" class="relative" aria-labelledby="countries-title">
+  <div class="mx-auto grid max-w-6xl items-center gap-12 px-4 py-24 lg:grid-cols-2 lg:py-32">
+    <div data-xp-anchor="globe" class="relative mx-auto aspect-square w-full max-w-[420px]" aria-hidden="true">
+      <app-stand-in moment="globe"></app-stand-in>
+    </div>
+    <app-feature-copy [group]="groups.countries"></app-feature-copy>
+  </div>
+</section>
+
+<!-- A/B destination splits -->
+<section data-palette="test" data-xp-section="test" class="relative" aria-labelledby="split-title">
+  <div class="mx-auto grid max-w-6xl items-center gap-12 px-4 py-24 lg:grid-cols-2 lg:py-32">
+    <div data-xp-anchor="split" class="relative mx-auto aspect-[4/3] w-full max-w-[460px]" aria-hidden="true">
+      <app-stand-in moment="split"></app-stand-in>
+    </div>
+    <app-feature-copy [group]="groups.split"></app-feature-copy>
+  </div>
+</section>
+
+<!-- Password-protected links: the padlock -->
+<section data-palette="protect" data-xp-section="protect" class="relative" aria-labelledby="password-title">
+  <div class="mx-auto grid max-w-6xl items-center gap-12 px-4 py-24 lg:grid-cols-2 lg:py-32">
+    <app-feature-copy [group]="groups.password"></app-feature-copy>
+    <div data-xp-anchor="lock" class="relative mx-auto aspect-square w-full max-w-[340px]" aria-hidden="true">
+      <app-stand-in moment="lock"></app-stand-in>
+    </div>
+  </div>
+</section>
+
+<!-- The other Pro features: the link settles, amber -->
+<section data-palette="pricing" data-xp-section="pricing" class="relative" aria-labelledby="more-title">
+  <div class="mx-auto max-w-6xl px-4 py-24 lg:py-32">
+    <div data-xp-anchor="pricing" class="relative mx-auto h-24 w-48" aria-hidden="true">
+      <app-stand-in moment="pricing"></app-stand-in>
+    </div>
+    <h2 id="more-title" class="xp-headline mt-6 text-center text-4xl sm:text-5xl lg:text-6xl">Also on <em class="xp-accent">Pro</em></h2>
+    <div class="mt-12 grid gap-4 md:grid-cols-2">
+      <z-card *ngFor="let g of proExtras">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white shadow-glow"><z-icon [name]="g.icon" [size]="20"></z-icon></div>
+          <z-badge tone="pro">Pro</z-badge>
+        </div>
+        <h3 class="mt-4 text-xl font-semibold">{{ g.title }}</h3>
+        <ul class="mt-3 space-y-2 text-sm text-muted">
+          <li *ngFor="let point of g.points" class="flex gap-2"><z-icon name="check" [size]="16" class="mt-0.5 shrink-0 text-accent"></z-icon>{{ point }}</li>
+        </ul>
+      </z-card>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA: its own gradient (always opaque), white text checked against both ends -->
+<section data-xp-section="cta" class="relative bg-cta text-white" aria-labelledby="cta-title">
+  <div class="mx-auto max-w-6xl px-4 py-24 text-center lg:py-32">
+    <div data-xp-anchor="cta" class="relative mx-auto h-24 w-24" aria-hidden="true">
+      <app-stand-in moment="cta"></app-stand-in>
+    </div>
+    <h2 id="cta-title" class="xp-headline mx-auto mt-8 max-w-4xl text-[2.75rem] sm:text-7xl lg:text-8xl">Your next link could tell you <em class="font-serif font-semibold italic">more</em>.</h2>
+    <a zButton routerLink="/signup" variant="secondary" size="lg" class="mt-10 !border-white/20 !bg-white !text-[#14121f] hover:!bg-white/90">Start free</a>
+    <p class="mt-6"><a routerLink="/pricing" class="underline underline-offset-2">Compare plans</a></p>
+  </div>
+</section>

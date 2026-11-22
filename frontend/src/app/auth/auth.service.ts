@@ -4,18 +4,21 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+/** The signed-in user as kept in the browser (a subset of the API's `me.user`). */
 interface User {
   id: string;
   email: string;
 }
 
-interface LoginResponse {
+/** Response of every endpoint that signs the user in (see the API contract). */
+interface Session {
   token: string;
-  user: User;
+  me: { user: User };
 }
 
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
+const authUrl = `${environment.apiUrl}/api/auth`;
 
 function readStoredUser(): User | null {
   try {
@@ -57,14 +60,34 @@ export class AuthService {
   }
 
   /** Exchanges a Google ID token for our own JWT. */
-  login(credential: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/api/auth/google`, { credential }).pipe(
-      tap((res) => {
-        localStorage.setItem(TOKEN_KEY, res.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-        this.currentUser = res.user;
-      }),
-    );
+  loginWithGoogle(credential: string): Observable<Session> {
+    return this.http.post<Session>(`${authUrl}/google`, { credential }).pipe(tap((s) => this.saveSession(s)));
+  }
+
+  loginWithPassword(email: string, password: string): Observable<Session> {
+    return this.http.post<Session>(`${authUrl}/login`, { email, password }).pipe(tap((s) => this.saveSession(s)));
+  }
+
+  /** Creates an unverified account and emails a verification link (no session yet). */
+  register(email: string, password: string): Observable<unknown> {
+    return this.http.post(`${authUrl}/register`, { email, password });
+  }
+
+  /** Uses the emailed token; signs the user in on success. */
+  verifyEmail(token: string): Observable<Session> {
+    return this.http.post<Session>(`${authUrl}/verify-email`, { token }).pipe(tap((s) => this.saveSession(s)));
+  }
+
+  resendVerification(email: string): Observable<unknown> {
+    return this.http.post(`${authUrl}/resend-verification`, { email });
+  }
+
+  forgotPassword(email: string): Observable<unknown> {
+    return this.http.post(`${authUrl}/forgot-password`, { email });
+  }
+
+  resetPassword(token: string, password: string): Observable<unknown> {
+    return this.http.post(`${authUrl}/reset-password`, { token, password });
   }
 
   clearSession(): void {
@@ -76,5 +99,12 @@ export class AuthService {
   logout(): void {
     this.clearSession();
     this.router.navigate(['/login']);
+  }
+
+  private saveSession({ token, me }: Session): void {
+    const user = { id: me.user.id, email: me.user.email };
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    this.currentUser = user;
   }
 }
