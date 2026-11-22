@@ -9,3 +9,5 @@ coverage/
 PLAN.md
 context.md
 .claude/
+prompts/
+backend/data/
