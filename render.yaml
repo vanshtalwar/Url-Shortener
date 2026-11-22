@@ -19,5 +19,23 @@ services:
         generateValue: true
       - key: VISITOR_HASH_SALT
         generateValue: true
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: RAZORPAY_PLAN_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_YEARLY
+        sync: false
+      - key: MAXMIND_ACCOUNT_ID
+        sync: false
+      - key: MAXMIND_LICENSE_KEY
+        sync: false
       - key: MONGOMS_DISABLE_POSTINSTALL
         value: "1" # skip downloading the test-only MongoDB binary during build

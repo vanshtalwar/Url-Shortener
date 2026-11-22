@@ -28,11 +28,45 @@ export function useTestDb() {
 export const fakeVerifyGoogleToken: VerifyGoogleToken = async (credential) => {
   if (!credential.startsWith('good:')) throw new Error('invalid');
   const name = credential.slice(5);
-  return { sub: `google-${name}`, email: `${name}@example.com` };
+  return { sub: `google-${name}`, email: `${name}@example.com`, emailVerified: !name.startsWith('unverified') };
 };
 
+/** Records every email instead of sending it; `lastToken()` pulls the token out of the newest link. */
+export function fakeMailer() {
+  const sent: { kind: 'verify' | 'reset'; to: string; link: string }[] = [];
+  return {
+    sent,
+    lastToken: () => new URL(sent[sent.length - 1].link).searchParams.get('token')!,
+    sendVerification: async (to: string, link: string) => void sent.push({ kind: 'verify', to, link }),
+    sendPasswordReset: async (to: string, link: string) => void sent.push({ kind: 'reset', to, link }),
+  };
+}
+
+/** In-memory stand-in for Razorpay. `state` holds what Razorpay would report for each subscription. */
+export function fakeBilling() {
+  const state = new Map<string, { id: string; status: string; current_end: number | null }>();
+  const calls: { method: string; args: unknown[] }[] = [];
+  let next = 1;
+  return {
+    state,
+    calls,
+    createSubscription: async (planId: string, totalCount: number, notes: Record<string, string>) => {
+      calls.push({ method: 'create', args: [planId, totalCount, notes] });
+      const sub = { id: `sub_${next++}`, status: 'created', current_end: null };
+      state.set(sub.id, sub);
+      return sub;
+    },
+    fetchSubscription: async (id: string) => state.get(id)!,
+    cancelAtCycleEnd: async (id: string) => {
+      calls.push({ method: 'cancel', args: [id] });
+      return state.get(id)!; // Razorpay keeps it active until the cycle ends
+    },
+  };
+}
+
 export function testApp(options: AppOptions = {}) {
-  return createApp({ verifyGoogleToken: fakeVerifyGoogleToken, ...options });
+  const geo = async () => ({ country: 'Unknown', city: 'Unknown' });
+  return createApp({ verifyGoogleToken: fakeVerifyGoogleToken, mailer: fakeMailer(), billing: fakeBilling(), geo, ...options });
 }
 
 /** Human clicks for one link, as the dashboard list reports them. */
