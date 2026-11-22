@@ -47,6 +47,11 @@
               class="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
               [ngClass]="(theme.preference$ | async) === t.id ? 'bg-brand text-white' : 'text-muted hover:text-ink'">{{ t.label }}</button>
     </div>
+    <div class="mt-4">
+      <z-switch label="Background particles" [checked]="(particles.on$ | async) ?? false" [disabled]="(particles.reducedMotion$ | async) ?? false"
+                (checkedChange)="particles.set($event)"></z-switch>
+      <p class="mt-1.5 text-xs text-muted">{{ (particles.reducedMotion$ | async) ? 'Off while your device is set to reduce motion.' : 'Saved on this device.' }}</p>
+    </div>
   </z-card>
 
   <z-card class="mt-4">

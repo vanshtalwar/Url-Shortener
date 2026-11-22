@@ -3,10 +3,18 @@ import { LAND_MASK, LAND_STEP } from './land-mask';
 
 export const GLOBE_RADIUS = 10;
 const MINT = 0x3dd6b5;
+const CORAL = 0xff6b5b; // data markers: apart from the mint land dots and trails
 const TRAIL = 16; // dots per arc
 const DOT = 1.0; // land-dot size per unit of globe scale (points are sized in screen terms, not by the object's scale)
-// Where sample clicks come from: latitude, longitude. A trail flies only while its city faces the camera.
-const ORIGINS: [number, number][] = [
+/** Where clicks come from; `weight` 0–1 sizes its trail (and its marker, on data-driven globes). */
+export interface GlobeOrigin {
+  lat: number;
+  lon: number;
+  weight: number;
+}
+
+// The landing's sample cities: latitude, longitude. A trail flies only while its city faces the camera.
+const SAMPLE_ORIGINS: [number, number][] = [
   [20.6, 78.9], [39.8, -98.6], [54, -2], [51.2, 10.4], [-14.2, -51.9], [36.2, 138.3],
   [9.1, 8.7], [-25.3, 133.8], [23.6, -102.5], [-0.8, 113.9], [-0.1, 37.9], [46.2, 2.2],
 ];
@@ -64,12 +72,41 @@ export class Globe {
   private readonly sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x141b3d, roughness: 0.85, metalness: 0.1 });
   private readonly dotGeometry = new THREE.SphereGeometry(0.32, 8, 6);
   private readonly dotMaterial = new THREE.MeshBasicMaterial({ color: MINT });
-  private readonly trails = new THREE.InstancedMesh(this.dotGeometry, this.dotMaterial, ORIGINS.length * TRAIL);
-  private readonly origins = ORIGINS.map(([lat, lon]) => onSphere(lat, lon, GLOBE_RADIUS));
-  private readonly curves = ORIGINS.map(() => new THREE.QuadraticBezierCurve3());
+  private readonly markerMaterial = new THREE.MeshBasicMaterial({ color: CORAL });
+  private readonly sources: GlobeOrigin[];
+  private readonly trails: THREE.InstancedMesh;
+  private readonly markers: THREE.InstancedMesh | null;
+  private readonly origins: THREE.Vector3[];
+  private readonly curves: THREE.QuadraticBezierCurve3[];
+  private readonly startAngle: number; // the globe's turn at 0 s
   private simple = false;
 
-  constructor() {
+  /**
+   * `origins`: real click locations (the dashboard), each marked on the globe — busiest first: the globe starts
+   * turned so the first faces the camera. Default: the landing's sample cities, starting with Europe, Africa and India.
+   */
+  constructor(origins?: GlobeOrigin[]) {
+    this.sources = origins ?? SAMPLE_ORIGINS.map(([lat, lon]) => ({ lat, lon, weight: 1 }));
+    // Longitude λ faces the camera at a turn of −λ; start a little before, so it turns into view.
+    this.startAngle = origins?.length ? -THREE.MathUtils.degToRad(origins[0].lon) - 0.3 : -1.1;
+    this.origins = this.sources.map(({ lat, lon }) => onSphere(lat, lon, GLOBE_RADIUS));
+    this.curves = this.sources.map(() => new THREE.QuadraticBezierCurve3());
+    this.trails = new THREE.InstancedMesh(this.dotGeometry, this.dotMaterial, Math.max(1, this.sources.length) * TRAIL);
+    this.markers = origins ? new THREE.InstancedMesh(this.dotGeometry, this.markerMaterial, Math.max(1, origins.length)) : null;
+    if (this.markers) {
+      const m = new THREE.Matrix4();
+      this.sources.forEach((origin, i) => {
+        const size = 0.6 + 1.2 * origin.weight;
+        this.markers?.setMatrixAt(i, m.makeScale(size, size, size).setPosition(onSphere(origin.lat, origin.lon, GLOBE_RADIUS * 1.01)));
+      });
+      this.spin.add(this.markers);
+    }
+    if (!this.sources.length) {
+      // No clicks located yet: nothing to mark or fly.
+      this.trails.count = 0;
+      if (this.markers) this.markers.count = 0;
+    }
+
     this.landGeometry.setAttribute('position', new THREE.BufferAttribute(landPositions(GLOBE_RADIUS), 3));
     this.spin.add(new THREE.Points(this.landGeometry, this.landMaterial), new THREE.Mesh(this.sphereGeometry, this.sphereMaterial));
     this.spin.rotation.x = 0.35;
@@ -85,7 +122,7 @@ export class Globe {
 
   /** `seconds` turns the globe; `arcs` 0–1 fades the trails in; `target` (world) is where they land. */
   pose(seconds: number, arcs: number, target: THREE.Vector3): void {
-    this.spin.rotation.y = -1.1 + seconds * 0.12; // starts with Europe, Africa and India facing the camera
+    this.spin.rotation.y = this.startAngle + seconds * 0.12;
     this.landMaterial.size = DOT * this.root.scale.x;
     this.root.updateMatrixWorld(true);
     this.trails.visible = arcs > 0.01;
@@ -101,10 +138,11 @@ export class Globe {
       // Control point: halfway, pushed out from the globe so the arc clears its surface.
       curve.v1.addVectors(curve.v0, curve.v2).multiplyScalar(0.5);
       curve.v1.setLength(Math.max(curve.v1.length(), GLOBE_RADIUS) * 1.45);
-      const head = (seconds * 0.35 + (a * 7) / ORIGINS.length) % 1.3; // each trail flies, then pauses a moment
+      const head = (seconds * 0.35 + (a * 7) / this.sources.length) % 1.3; // each trail flies, then pauses a moment
+      const weight = 0.5 + 0.5 * this.sources[a].weight;
       for (let k = 0; k < TRAIL; k++) {
         const t = head - k * 0.028;
-        const size = !facing || k >= length || t < 0 || t > 1 ? 0 : (1 - k / length) * arcs;
+        const size = !facing || k >= length || t < 0 || t > 1 ? 0 : (1 - k / length) * arcs * weight;
         curve.getPoint(Math.min(Math.max(t, 0), 1), scratch.point);
         this.trails.setMatrixAt(a * TRAIL + k, scratch.instance.makeScale(size, size, size).setPosition(scratch.point));
       }
@@ -121,6 +159,8 @@ export class Globe {
     this.sphereMaterial.dispose();
     this.dotGeometry.dispose();
     this.dotMaterial.dispose();
+    this.markerMaterial.dispose();
     this.trails.dispose();
+    this.markers?.dispose();
   }
 }

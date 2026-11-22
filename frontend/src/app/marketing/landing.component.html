@@ -25,20 +25,7 @@
     </div>
 
     <div data-xp-anchor="hero" class="relative h-[320px] sm:h-[420px] lg:h-[520px]" aria-hidden="true">
-      <svg viewBox="0 0 320 120" class="h-full w-full">
-        <defs>
-          <linearGradient id="hero-chain" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" style="stop-color: rgb(var(--brand-glow))" />
-            <stop offset="1" style="stop-color: rgb(var(--brand-to))" />
-          </linearGradient>
-        </defs>
-        <g fill="none" stroke="url(#hero-chain)" stroke-width="9" stroke-linecap="round">
-          <rect x="20" y="40" width="90" height="40" rx="20" />
-          <rect x="90" y="48" width="70" height="24" rx="12" opacity="0.7" />
-          <rect x="140" y="40" width="90" height="40" rx="20" />
-          <rect x="210" y="48" width="70" height="24" rx="12" opacity="0.7" />
-        </g>
-      </svg>
+      <app-stand-in moment="hero"></app-stand-in>
     </div>
   </div>
 
@@ -54,16 +41,13 @@
 </section>
 
 <!-- 2 · Share (QR) -->
-<section data-palette="share" class="relative" aria-labelledby="share-title">
+<section data-palette="share" data-xp-section="share" class="relative" aria-labelledby="share-title">
   <div class="mx-auto max-w-6xl px-4 py-24 lg:py-32">
     <h2 id="share-title" class="xp-headline text-[2.75rem] sm:text-7xl lg:text-8xl">Share it <em class="xp-accent">anywhere</em>.</h2>
     <p class="mt-6 max-w-2xl text-lg text-muted">Social posts, emails, print, a QR code on a poster — it all goes through one short link.</p>
     <div class="mt-14 grid items-center gap-12 lg:grid-cols-2">
       <div data-xp-anchor="qr" class="relative mx-auto aspect-square w-full max-w-[400px]" aria-hidden="true">
-        <svg viewBox="0 0 90 90" class="h-full w-full fill-tint">
-          <path d="M4 4h22v22H4zM9 9v12h12V9zM64 4h22v22H64zM69 9v12h12V9zM4 64h22v22H4zM9 69v12h12V69z" fill-rule="evenodd" />
-          <path d="M12 12h6v6h-6zM72 12h6v6h-6zM12 72h6v6h-6zM32 4h6v6h-6zM44 10h6v6h-6zM32 20h12v6H32zM50 28h6v12h-6zM4 32h12v6H4zM22 38h12v6H22zM38 38h6v6h-6zM62 32h6v6h-6zM74 38h12v6H74zM32 50h6v12h-6zM44 56h18v6H44zM68 50h6v6h-6zM80 56h6v12h-6zM50 68h6v6h-6zM38 74h6v12h-6zM56 80h12v6H56zM68 68h6v6h-6z" />
-        </svg>
+        <app-stand-in moment="qr"></app-stand-in>
       </div>
       <ul class="space-y-8">
         <li *ngFor="let item of shareItems" class="flex gap-4">
@@ -79,7 +63,7 @@
 </section>
 
 <!-- 3 · Know what's working (bar chart) -->
-<section data-palette="data" class="relative" aria-labelledby="know-title">
+<section data-palette="data" data-xp-section="know" class="relative" aria-labelledby="know-title">
   <div class="mx-auto max-w-6xl px-4 py-24 lg:py-32">
     <h2 id="know-title" class="xp-headline text-[2.75rem] sm:text-7xl lg:text-8xl">Know what's <em class="xp-accent">working</em>.</h2>
     <div class="mt-14 grid items-center gap-12 lg:grid-cols-2">
@@ -98,29 +82,19 @@
         <a zButton routerLink="/features" variant="secondary" class="mt-8">Explore features<z-icon name="arrow-right" [size]="16"></z-icon></a>
       </div>
       <div data-xp-anchor="bars" class="relative mx-auto aspect-[4/3] w-full max-w-[480px]" aria-hidden="true">
-        <svg viewBox="0 0 160 120" class="h-full w-full fill-tint">
-          <rect *ngFor="let bar of sampleBars; let i = index" [attr.x]="6 + i * 22" [attr.y]="114 - bar" width="16" [attr.height]="bar" rx="3" [attr.opacity]="0.45 + i * 0.08" />
-        </svg>
+        <app-stand-in moment="bars"></app-stand-in>
       </div>
     </div>
   </div>
 </section>
 
 <!-- 4 · Where visitors are (globe) -->
-<section data-palette="globe" class="relative" aria-labelledby="where-title">
+<section data-palette="globe" data-xp-section="where" class="relative" aria-labelledby="where-title">
   <div class="mx-auto max-w-6xl px-4 py-24 lg:py-32">
     <h2 id="where-title" class="xp-headline text-[2.75rem] sm:text-7xl lg:text-8xl">See <em class="xp-accent">where</em> they are.</h2>
     <div class="mt-14 grid items-center gap-12 lg:grid-cols-2">
       <div data-xp-anchor="globe" class="relative mx-auto aspect-square w-full max-w-[420px]" aria-hidden="true">
-        <svg viewBox="0 0 120 120" class="h-full w-full fill-none stroke-tint" stroke-width="1.5">
-          <circle cx="60" cy="60" r="48" opacity="0.9" />
-          <ellipse cx="60" cy="60" rx="20" ry="48" opacity="0.5" />
-          <ellipse cx="60" cy="60" rx="38" ry="48" opacity="0.35" />
-          <path d="M14 46h92M14 74h92" opacity="0.4" />
-          <path d="M36 70Q60 20 86 44" stroke-width="2" stroke-dasharray="3 3" />
-          <path d="M30 50Q58 96 82 76" stroke-width="2" stroke-dasharray="3 3" />
-          <circle cx="86" cy="44" r="3" class="fill-tint" /><circle cx="82" cy="76" r="3" class="fill-tint" />
-        </svg>
+        <app-stand-in moment="globe"></app-stand-in>
       </div>
       <div>
         <p class="max-w-xl text-lg text-muted">Country and city breakdowns on Pro, so you can see which places your links actually reach.</p>
@@ -137,18 +111,13 @@
 </section>
 
 <!-- 5 · Test destinations (A/B split) -->
-<section data-palette="test" class="relative" aria-labelledby="test-title">
+<section data-palette="test" data-xp-section="test" class="relative" aria-labelledby="test-title">
   <div class="mx-auto max-w-6xl px-4 py-24 lg:py-32">
     <h2 id="test-title" class="xp-headline text-[2.75rem] sm:text-7xl lg:text-8xl">Test every <em class="xp-accent">destination</em>.</h2>
     <p class="mt-6 max-w-2xl text-lg text-muted">Send one link to several pages by weight and compare which one people actually choose.</p>
     <div class="mt-14 grid items-center gap-12 lg:grid-cols-2">
       <div data-xp-anchor="split" class="relative mx-auto aspect-[4/3] w-full max-w-[460px]" aria-hidden="true">
-        <svg viewBox="0 0 160 120" class="h-full w-full fill-none stroke-tint" stroke-linecap="round">
-          <rect x="8" y="48" width="40" height="24" rx="12" stroke-width="6" />
-          <path d="M48 60C88 60 92 28 136 28" stroke-width="7" />
-          <path d="M48 60C88 60 92 92 136 92" stroke-width="4" />
-          <circle cx="142" cy="28" r="7" class="fill-tint" /><circle cx="142" cy="92" r="7" class="fill-tint" />
-        </svg>
+        <app-stand-in moment="split"></app-stand-in>
       </div>
       <div>
         <ul class="space-y-3" aria-label="Sample split">
@@ -164,7 +133,7 @@
 </section>
 
 <!-- 6 · Protect (padlock) -->
-<section data-palette="protect" class="relative" aria-labelledby="protect-title">
+<section data-palette="protect" data-xp-section="protect" class="relative" aria-labelledby="protect-title">
   <div class="mx-auto max-w-6xl px-4 py-24 lg:py-32">
     <h2 id="protect-title" class="xp-headline text-[2.75rem] sm:text-7xl lg:text-8xl">Lock what <em class="xp-accent">matters</em>.</h2>
     <div class="mt-14 grid items-center gap-12 lg:grid-cols-2">
@@ -178,18 +147,14 @@
         </li>
       </ul>
       <div data-xp-anchor="lock" class="relative mx-auto aspect-square w-full max-w-[340px]" aria-hidden="true">
-        <svg viewBox="0 0 120 120" class="h-full w-full fill-none stroke-tint" stroke-width="8" stroke-linecap="round">
-          <path d="M38 54V40a22 22 0 0 1 44 0v14" />
-          <rect x="26" y="54" width="68" height="54" rx="12" class="fill-tint" stroke="none" opacity="0.9" />
-          <circle cx="60" cy="78" r="6" class="fill-canvas" stroke="none" /><path d="M60 82v10" class="stroke-canvas" stroke-width="6" />
-        </svg>
+        <app-stand-in moment="lock"></app-stand-in>
       </div>
     </div>
   </div>
 </section>
 
 <!-- 7 · Pricing teaser -->
-<section data-palette="pricing" class="relative" aria-labelledby="pricing-title">
+<section data-palette="pricing" data-xp-section="pricing" class="relative" aria-labelledby="pricing-title">
   <div class="mx-auto max-w-6xl px-4 pb-16 pt-24 lg:pt-32">
     <h2 id="pricing-title" class="xp-headline text-[2.75rem] sm:text-7xl lg:text-8xl">Start free. Go <em class="xp-accent">Pro</em>.</h2>
     <p class="mt-6 max-w-2xl text-lg text-muted">Pro is {{ proMonthly }}/month, or two months free when you pay yearly.</p>
@@ -202,9 +167,7 @@
       </z-card>
       <div>
         <div data-xp-anchor="pricing" class="relative mx-auto h-24 w-48" aria-hidden="true">
-          <svg viewBox="0 0 160 60" class="h-full w-full fill-none stroke-tint" stroke-width="8" stroke-linecap="round">
-            <rect x="12" y="16" width="76" height="28" rx="14" /><rect x="72" y="16" width="76" height="28" rx="14" />
-          </svg>
+          <app-stand-in moment="pricing"></app-stand-in>
         </div>
         <z-card class="relative border-tint/60">
           <z-badge tone="pro" class="absolute right-5 top-5">Most popular</z-badge>
@@ -233,16 +196,14 @@
   </div>
 </section>
 
-<!-- 8 · Final CTA: its own gradient (always opaque), white text checked against both ends -->
-<section class="relative bg-cta text-white" aria-labelledby="cta-title">
+<!-- 8 · Final CTA: the protect section's palette (near-black, amber accent) -->
+<section data-palette="protect" data-xp-section="cta" class="relative" aria-labelledby="cta-title">
   <div class="mx-auto max-w-6xl px-4 py-24 text-center lg:py-32">
     <div data-xp-anchor="cta" class="relative mx-auto h-24 w-24" aria-hidden="true">
-      <svg viewBox="0 0 24 24" class="h-full w-full" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-        <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 1 1 0 10h-2M8 12h8" />
-      </svg>
+      <app-stand-in moment="cta"></app-stand-in>
     </div>
-    <h2 id="cta-title" class="xp-headline mx-auto mt-8 max-w-4xl text-[2.75rem] sm:text-7xl lg:text-8xl">Your next link could tell you <em class="font-serif font-semibold italic">more</em>.</h2>
-    <p class="mx-auto mt-6 max-w-xl text-lg">Create a free account in under a minute.</p>
+    <h2 id="cta-title" class="xp-headline mx-auto mt-8 max-w-4xl text-[2.75rem] sm:text-7xl lg:text-8xl">Your next link could tell you <em class="xp-accent">more</em>.</h2>
+    <p class="mx-auto mt-6 max-w-xl text-lg text-muted">Create a free account in under a minute.</p>
     <a zButton routerLink="/signup" variant="secondary" size="lg" class="mt-10 !border-white/20 !bg-white !text-[#14121f] hover:!bg-white/90">Start free</a>
   </div>
 </section>

@@ -6,14 +6,8 @@ import { LinkChain } from './link-chain';
 import { Padlock, PADLOCK_HEIGHT } from './padlock';
 import { Phone } from './phone';
 import type { Tier } from './quality';
+import type { Box, Pointer } from './rig';
 import type { Layer, Stage } from './stage';
-
-export interface Box {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
 
 export type Moment = 'hero' | 'qr' | 'bars' | 'globe' | 'split' | 'lock' | 'pricing' | 'cta';
 
@@ -45,6 +39,11 @@ const CORAL = new THREE.Color(0xff6b5b);
 const IDENTITY = new THREE.Quaternion();
 const SPLIT_WEIGHTS = [0.6, 0.4]; // the sample split on the page: link sizes follow the weights
 const SPLIT_ENDS = [0.24, 0.76]; // where the two chains end, as fractions of the A/B box height (right edge)
+// In the hero the link turns to face the mouse (radians at full follow; more yaw would show the chain end-on, as it
+// starts turned) and leans towards it (share of the hero box).
+const FOLLOW_YAW = 0.35;
+const FOLLOW_PITCH = 0.3;
+const FOLLOW_LEAN = 0.08;
 
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 /** Progress of `t` through [from, to], clamped to 0–1. */
@@ -119,6 +118,8 @@ export class Journey {
   private readonly dots = SPLIT_WEIGHTS.map(() => new THREE.Mesh(this.dotGeometry, this.splitMaterial));
   private readonly padlock = new Padlock();
   private readonly barsTurn = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.32, -0.5, 0));
+  /** The hero link's follow of the mouse, −1…1 each way (+x right, +y down), sprung; `time` = last frame's seconds. */
+  readonly follow = { x: 0, y: 0, vx: 0, vy: 0, time: 0 };
 
   /** `qrText` is what the QR code really encodes. */
   constructor(stage: Stage, qrText: string) {
@@ -163,8 +164,11 @@ export class Journey {
     this.globe.simplify(tier !== 'high');
   }
 
-  /** Live: pose everything for this scroll position. `boxes`: the anchors' current rectangles on screen. */
-  update(stage: Stage, p: Progress, boxes: Record<Moment, Box>, seconds: number, tiltX: number, tiltY: number): Layer {
+  /**
+   * Live: pose everything for this scroll position. `boxes`: the anchors' current rectangles on screen; `tiltX`/`tiltY`
+   * the eased pointer parallax; `pointer` the mouse, which the hero link follows.
+   */
+  update(stage: Stage, p: Progress, boxes: Record<Moment, Box>, seconds: number, tiltX: number, tiltY: number, pointer: Pointer): Layer {
     const { qr, bars, globe, lock } = this.frames;
     fit(stage, boxes.qr, qr, this.qrSize + QR_MARGIN, this.qrSize + QR_MARGIN);
     fit(stage, boxes.bars, bars, this.barsSize.width, this.barsSize.height, this.barsTurn);
@@ -181,12 +185,19 @@ export class Journey {
     const heroScale = chainScale(hero, stage.height, stage.camera.position.z);
     const heroAt = stage.planePoint(hero.left + hero.width / 2, hero.top + hero.height / 2, scratch.a);
     const qrLinkScale = (boxes.qr.height * 0.3 * perPixel) / LINK_WIDTH;
+    this.followPointer(stage, pointer, hero, seconds);
     if (p.share === 0) {
-      // Rises out of the hero and drifts to the QR's centre.
+      // Rises out of the hero and drifts to the QR's centre. In the hero it faces the mouse and leans towards it,
+      // less and less as it sets off (the QR code must hold still to scan).
       const u = ease(range(p.toShare, 0.15, 1));
       const at = scratch.b.lerpVectors(heroAt, qr.position, u);
       at.y += Math.sin(Math.PI * u) * stage.height * 0.12 * perPixel;
+      const lean = 1 - range(p.toShare, 0, 0.25);
+      at.x += this.follow.x * hero.width * FOLLOW_LEAN * perPixel * lean;
+      at.y -= this.follow.y * hero.height * FOLLOW_LEAN * perPixel * lean;
       chain.set(stage, at, THREE.MathUtils.lerp(heroScale, qrLinkScale, u));
+      chain.root.rotateY(this.follow.x * FOLLOW_YAW * lean); // set() faced it to the camera: turn from there
+      chain.root.rotateX(this.follow.y * FOLLOW_PITCH * lean);
     } else if (p.know < 0.55) {
       chain.set(stage, qr.position, qrLinkScale * (1 - easeOut(range(p.share, 0, 0.18)))); // shrinks into the burst
     } else if (p.toWhere === 0) {
@@ -421,6 +432,23 @@ export class Journey {
       dot.scale.setScalar(Math.max(scale * 0.9 * easeOut(range(grow, 0.9, 1)), 1e-5));
       dot.visible = grow > 0.9;
     });
+  }
+
+  /**
+   * Springs `follow` towards the mouse's offset from the hero's centre, in half-screens (back to 0 without a mouse).
+   * Under-damped, so the link overshoots a little and wobbles to rest.
+   */
+  private followPointer(stage: Stage, pointer: Pointer, hero: Box, seconds: number): void {
+    const f = this.follow;
+    const dt = Math.min(Math.max(seconds - f.time, 0), 1 / 30);
+    f.time = seconds;
+    const toward = (offset: number, half: number) => (pointer.on ? Math.max(-1, Math.min(1, offset / half)) : 0);
+    const targetX = toward(pointer.x - hero.left - hero.width / 2, stage.width / 2);
+    const targetY = toward(pointer.y - hero.top - hero.height / 2, stage.height / 2);
+    f.vx += (90 * (targetX - f.x) - 11 * f.vx) * dt;
+    f.vy += (90 * (targetY - f.y) - 11 * f.vy) * dt;
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
   }
 
   /** Link size resting on the tallest bar: a bit wider than the bar. */

@@ -153,7 +153,7 @@
   }
 
   /* The 3D experience has drawn this anchor (src/app/experience): hide its SVG stand-in, keeping its space. */
-  [data-xp-drawn] > svg {
+  [data-xp-drawn] > app-stand-in {
     visibility: hidden;
   }
 

@@ -25,7 +25,19 @@
 
   <ng-container *ngIf="state.status === 'ready'">
     <ng-container *ngIf="state.data.totals.links > 0; else empty">
-      <div class="mt-6 grid gap-4 sm:grid-cols-3">
+      <!-- Hero: today's clicks, and a 3D link pulsing quicker and brighter the more there are -->
+      <z-card class="mt-6 flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <h2 class="text-sm font-medium text-muted">Today <span class="font-normal">(UTC)</span></h2>
+          <p class="mt-1 text-4xl font-bold tabular-nums">{{ state.today | number }}</p>
+          <p class="mt-1 text-sm text-muted">{{ state.today === 1 ? 'click' : 'clicks' }} so far</p>
+        </div>
+        <z-scene kind="pulse" [data]="{ clicks: state.today }" class="flex h-24 w-24 shrink-0 items-center justify-center sm:w-48">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white shadow-glow" aria-hidden="true"><z-icon name="link" [size]="22"></z-icon></div>
+        </z-scene>
+      </z-card>
+
+      <div class="mt-4 grid gap-4 sm:grid-cols-3">
         <z-stat-tile label="Clicks" [value]="state.data.totals.clicks | number" [hint]="'Last ' + state.data.days + ' days'"></z-stat-tile>
         <z-stat-tile label="Unique visitors" [value]="state.data.totals.uniques | number" [hint]="'Last ' + state.data.days + ' days'"></z-stat-tile>
         <z-stat-tile label="Links" [value]="state.data.totals.links | number" hint="All time"></z-stat-tile>
@@ -51,7 +63,9 @@
 
     <ng-template #empty>
       <z-card class="mt-6 py-12 text-center">
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white shadow-glow"><z-icon name="link" [size]="22"></z-icon></div>
+        <z-scene kind="chain" class="mx-auto flex h-28 w-56 items-center justify-center">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white shadow-glow" aria-hidden="true"><z-icon name="link" [size]="22"></z-icon></div>
+        </z-scene>
         <h2 class="mt-4 text-lg font-semibold">Create your first short link</h2>
         <p class="mt-1 text-sm text-muted">Your clicks and visitors will show up here.</p>
         <a zButton routerLink="/app/links" class="mt-6"><z-icon name="plus" [size]="16"></z-icon>New link</a>

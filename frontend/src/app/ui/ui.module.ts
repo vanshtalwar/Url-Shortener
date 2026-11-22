@@ -8,6 +8,7 @@ import { IconComponent } from './icon.component';
 import { InputDirective } from './input.directive';
 import { LogoComponent } from './logo.component';
 import { ModalComponent } from './modal.component';
+import { SceneComponent } from './scene.component';
 import { StatTileComponent } from './stat-tile.component';
 import { SwitchComponent } from './switch.component';
 import { ThemeToggleComponent } from './theme-toggle.component';
@@ -16,7 +17,7 @@ import { UsageMeterComponent } from './usage-meter.component';
 
 const PARTS = [
   BadgeComponent, ButtonComponent, CardComponent, DrawerComponent, IconComponent, InputDirective, LogoComponent,
-  ModalComponent, StatTileComponent, SwitchComponent, ThemeToggleComponent, ToastHostComponent, UsageMeterComponent,
+  ModalComponent, SceneComponent, StatTileComponent, SwitchComponent, ThemeToggleComponent, ToastHostComponent, UsageMeterComponent,
 ];
 
 /** Zelqit's shared UI building blocks. Import into any feature module. */

@@ -1,38 +1,9 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, NgZone, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import type { IconName } from '../ui/icon.component';
+import { followSectionPalette, startAfterFirstPaint } from '../experience-loader';
+import { startCursor } from './cursor';
 import { PRICES, formatInr } from './plans';
-
-/** Runs `task` when the browser is idle (at most ~3 s later). Returns a cancel function. */
-function whenIdle(task: () => void): () => void {
-  if ('requestIdleCallback' in window) {
-    const id = requestIdleCallback(task, { timeout: 3000 });
-    return () => cancelIdleCallback(id);
-  }
-  const id = setTimeout(task, 1500);
-  return () => clearTimeout(id);
-}
-
-/**
- * Runs `task` once the page's first contentful paint is on screen and the browser is idle. Idle alone isn't enough:
- * it can come before that frame is presented, and WebGL start-up would then delay it. Returns a cancel function.
- */
-function afterFirstPaint(task: () => void): () => void {
-  let cancel: () => void;
-  if (!PerformanceObserver.supportedEntryTypes?.includes('paint')) {
-    const id = requestAnimationFrame(() => (cancel = whenIdle(task))); // runs once rendering has started
-    cancel = () => cancelAnimationFrame(id);
-  } else {
-    const observer = new PerformanceObserver((entries) => {
-      if (!entries.getEntriesByName('first-contentful-paint').length) return;
-      observer.disconnect();
-      cancel = whenIdle(task);
-    });
-    observer.observe({ type: 'paint', buffered: true }); // buffered: already painted (in-app navigation) fires at once
-    cancel = () => observer.disconnect();
-  }
-  return () => cancel();
-}
 
 interface Feature {
   icon: IconName;
@@ -48,9 +19,8 @@ interface Feature {
 export class LandingComponent implements AfterViewInit, OnDestroy {
   demoUrl = '';
   private stopExperience?: () => void;
-  private cancelStart?: () => void;
   private stopPalette?: () => void;
-  private destroyed = false;
+  private stopCursor?: () => void;
   readonly proMonthly = formatInr(PRICES.monthly);
 
   readonly strip = [
@@ -74,7 +44,6 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
     { label: 'Unique', count: 903 },
     { label: 'Bots', count: 57 },
   ];
-  readonly sampleBars = [34, 48, 42, 63, 71, 88, 104];
   readonly sampleSplit = [
     { weight: 60, url: 'example.com/landing-a' },
     { weight: 40, url: 'example.com/landing-b' },
@@ -97,57 +66,22 @@ export class LandingComponent implements AfterViewInit, OnDestroy {
   constructor(private router: Router, private host: ElementRef<HTMLElement>, private zone: NgZone) {}
 
   /**
-   * The 3D experience (three.js + GSAP + Lenis) is its own chunk, loaded after first paint so it never competes
-   * with it. It runs outside Angular, so its frame loop and listeners never trigger change detection.
+   * Colours follow the section in view; the 3D journey (its own chunk) starts after first paint; with a mouse, the
+   * cursor becomes a dot in a jiggly ring (./cursor).
    */
   ngAfterViewInit(): void {
-    this.zone.runOutsideAngular(() => {
-      this.stopPalette = this.followSectionPalette();
-      this.cancelStart = afterFirstPaint(() => {
-        import('../experience/landing')
-          .then(({ startLanding }) => (this.destroyed ? null : startLanding(this.host.nativeElement)))
-          .then((stop) => {
-            if (!stop) return;
-            if (this.destroyed) return stop(); // left the page while it was starting
-            this.stopExperience = stop;
-          })
-          .catch((error) => console.warn('3D experience unavailable; keeping the static hero.', error));
-      });
-    });
+    const page = this.host.nativeElement;
+    this.stopPalette = followSectionPalette(this.zone, page);
+    this.stopCursor = this.zone.runOutsideAngular(() => startCursor());
+    this.stopExperience = startAfterFirstPaint(this.zone, () => import('../experience/journey-page'), ({ startJourney }) =>
+      startJourney(page, { share: '120%', know: '100%', test: '100%', protect: '100%' }),
+    );
   }
 
   ngOnDestroy(): void {
-    this.destroyed = true;
-    this.cancelStart?.();
     this.stopExperience?.();
     this.stopPalette?.();
-  }
-
-  /**
-   * The header, footer and page background take the palette of the section in the middle of the screen
-   * (`data-palette` on <html>). In live 3D mode the sections hand their palettes to <html> as well, so everything
-   * on screen shares it (src/app/experience/landing.ts). Sections without a palette (the CTA) keep the last one.
-   */
-  private followSectionPalette(): () => void {
-    const root = document.documentElement;
-    const sections = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('section'));
-    const update = () => {
-      const middle = window.innerHeight / 2;
-      const section = sections.find((s) => {
-        const box = s.getBoundingClientRect();
-        return box.top <= middle && box.bottom > middle;
-      });
-      const palette = section?.dataset['palette'] ?? section?.dataset['xpPalette'];
-      if (palette && root.dataset['palette'] !== palette) root.dataset['palette'] = palette;
-    };
-    update();
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-      delete root.dataset['palette'];
-    };
+    this.stopCursor?.();
   }
 
   /** Guests can't shorten here: carry the URL into sign-up instead. */

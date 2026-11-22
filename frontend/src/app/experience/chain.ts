@@ -62,7 +62,7 @@ export class Chain {
   private readonly glow = new THREE.PointLight(GLOW, 0, 6);
   private readonly links: THREE.Mesh[];
   private readonly centre = Math.floor(LINK_COUNT / 2);
-  private compression = 0;
+  private glowLevel = 0; // 0–1: how strongly the surviving link glows
   private scale = 1;
 
   constructor() {
@@ -78,9 +78,10 @@ export class Chain {
 
   /**
    * `compression` 0–1 (see compressionAt); `tiltX`/`tiltY` −1…1 pointer parallax; `seconds` drives the slow sway;
-   * `spin` turns it about its own vertical axis (radians); `sheen` 0–1 warms the surviving link to amber (Pro).
+   * `spin` turns it about its own vertical axis (radians); `sheen` 0–1 warms the surviving link to amber (Pro);
+   * `glow` scales the surviving link's glow (the dashboard's pulse).
    */
-  pose(seconds: number, compression: number, tiltX: number, tiltY: number, spin = 0, sheen = 0): void {
+  pose(seconds: number, compression: number, tiltX: number, tiltY: number, spin = 0, sheen = 0, glow = 1): void {
     this.links.forEach((mesh, i) => {
       const offset = i - this.centre;
       mesh.position.x = offset * PITCH * (1 - compression);
@@ -88,11 +89,11 @@ export class Chain {
       mesh.scale.setScalar(Math.max(scale, 0.001));
       mesh.visible = scale > 0.01;
     });
-    this.centreMaterial.emissiveIntensity = 0.9 * compression * (1 - 0.65 * sheen); // amber reads as gold metal, not a lamp
+    this.centreMaterial.emissiveIntensity = 0.9 * compression * (1 - 0.65 * sheen) * glow; // amber reads as gold metal, not a lamp
     this.centreMaterial.color.lerpColors(VIOLET, AMBER, sheen);
     this.centreMaterial.emissive.lerpColors(VIOLET_GLOW, AMBER, sheen);
     this.glow.color.lerpColors(GLOW, AMBER, sheen);
-    this.compression = compression;
+    this.glowLevel = compression * glow;
     this.updateGlow();
     this.body.rotation.set(0.35 + tiltY * MAX_TILT, -0.55 + Math.sin(seconds * 0.4) * 0.12 + tiltX * MAX_TILT + spin, 0.1);
   }
@@ -115,7 +116,7 @@ export class Chain {
 
   /** The glow light scales with the chain: same look at any size (illuminance ∝ intensity / distance²). */
   private updateGlow(): void {
-    this.glow.intensity = 8 * this.compression * this.scale ** 2;
+    this.glow.intensity = 8 * this.glowLevel * this.scale ** 2;
     this.glow.distance = 6 * this.scale;
   }
 

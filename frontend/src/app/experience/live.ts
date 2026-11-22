@@ -64,35 +64,44 @@ export function revealHeadlines(root: HTMLElement): () => void {
   return () => splits.forEach((split) => split.revert());
 }
 
+/** How much scroll (CSS length, e.g. "120%" of the viewport) each pinned moment holds its section for. */
+export interface Pins {
+  share: string;
+  know: string;
+  test: string;
+  protect: string;
+}
+
 /**
- * The landing journey's scroll ranges (journey.ts `Progress`): travels between sections, and pins that hold the QR
- * and bar-chart sections while their moments play. Pins start when the section's 3D box reaches the middle of the
- * screen, so it's in view at any width. Call after startLoop. Returns a progress reader and a kill function.
+ * The journey's scroll ranges (journey.ts `Progress`): travels between sections, and pins that hold the QR,
+ * bar-chart, A/B and padlock sections while their moments play. Sections are found by `data-xp-section`, 3D boxes by
+ * `data-xp-anchor`. Pins start when the section's 3D box reaches the middle of the screen, so it's in view at any
+ * width. Call after startLoop. Returns a progress reader and a kill function.
  */
-export function trackJourney(page: HTMLElement): { read(target: Progress): Progress; kill(): void } {
-  const section = (title: string) => page.querySelector<HTMLElement>(`section[aria-labelledby="${title}"]`);
-  const box = (name: string) => page.querySelector<HTMLElement>(`[data-xp-anchor="${name}"]`);
-  const sections = ['share', 'know', 'where', 'test', 'protect', 'pricing', 'cta'].map((name) => section(`${name}-title`));
-  const boxes = ['qr', 'bars', 'globe', 'split', 'lock', 'pricing', 'cta'].map(box);
-  if (sections.some((s) => !s) || boxes.some((b) => !b)) throw new Error('Landing: journey sections not found');
-  const [share, know, where, test, protect, pricing, cta] = sections as HTMLElement[];
-  const [qr, bars, globe, split, lock, pricingBox, ctaBox] = boxes as HTMLElement[];
+export function trackJourney(page: HTMLElement, pins: Pins): { read(target: Progress): Progress; kill(): void } {
+  const find = (selector: string) => {
+    const element = page.querySelector<HTMLElement>(selector);
+    if (!element) throw new Error(`Journey: ${selector} not found`);
+    return element;
+  };
+  const section = (name: string) => find(`[data-xp-section="${name}"]`);
+  const box = (name: string) => find(`[data-xp-anchor="${name}"]`);
   // Travels run from a section's top entering the screen to its 3D box reaching the middle; pins hold the section
   // from there. Created in page order, so each one's position accounts for the pins above it.
-  const travel = (into: HTMLElement, box: HTMLElement) => ScrollTrigger.create({ trigger: into, start: 'top bottom', endTrigger: box, end: 'center center' });
-  const pin = (section: HTMLElement, box: HTMLElement, length: string) => ScrollTrigger.create({ trigger: box, start: 'center center', end: `+=${length}`, pin: section });
+  const travel = (into: string, to: string) => ScrollTrigger.create({ trigger: section(into), start: 'top bottom', endTrigger: box(to), end: 'center center' });
+  const pin = (name: string, at: string, length: string) => ScrollTrigger.create({ trigger: box(at), start: 'center center', end: `+=${length}`, pin: section(name) });
   const triggers: Record<keyof Progress, ScrollTrigger> = {
-    toShare: travel(share, qr),
-    share: pin(share, qr, '120%'),
-    toKnow: travel(know, bars),
-    know: pin(know, bars, '100%'),
-    toWhere: travel(where, globe),
-    toTest: travel(test, split),
-    test: pin(test, split, '100%'),
-    toProtect: travel(protect, lock),
-    protect: pin(protect, lock, '100%'),
-    toPricing: travel(pricing, pricingBox),
-    toCta: travel(cta, ctaBox),
+    toShare: travel('share', 'qr'),
+    share: pin('share', 'qr', pins.share),
+    toKnow: travel('know', 'bars'),
+    know: pin('know', 'bars', pins.know),
+    toWhere: travel('where', 'globe'),
+    toTest: travel('test', 'split'),
+    test: pin('test', 'split', pins.test),
+    toProtect: travel('protect', 'lock'),
+    protect: pin('protect', 'lock', pins.protect),
+    toPricing: travel('pricing', 'pricing'),
+    toCta: travel('cta', 'cta'),
   };
   document.fonts?.ready.then(() => ScrollTrigger.refresh()); // web fonts change section heights
   return {

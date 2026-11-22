@@ -1,7 +1,10 @@
-import { ChangeDetectionStrategy, Component, HostListener, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
+import { startAfterFirstPaint } from '../experience-loader';
 import type { IconName } from '../ui/icon.component';
 import { MeService } from '../me.service';
+import { ParticlesPreferenceService } from '../ui/particles-preference.service';
 import { UpgradePromptService } from '../upgrade-prompt.service';
 
 interface NavItem {
@@ -11,13 +14,16 @@ interface NavItem {
   exact: boolean;
 }
 
-/** Signed-in shell: sidebar (collapsible on mobile) + top bar with theme toggle and account menu. */
+/**
+ * Signed-in shell: sidebar (collapsible on mobile) + top bar with theme toggle and account menu, and the background
+ * particles (experience/backdrop.ts, its own chunk) unless switched off in Settings or reduced motion is asked for.
+ */
 @Component({
   selector: 'app-app-layout',
   templateUrl: './app-layout.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppLayoutComponent implements OnInit {
+export class AppLayoutComponent implements OnInit, OnDestroy {
   sidebarOpen = false;
   accountOpen = false;
   readonly nav: NavItem[] = [
@@ -28,10 +34,31 @@ export class AppLayoutComponent implements OnInit {
     { label: 'Settings', path: '/app/settings', icon: 'settings', exact: false },
   ];
 
-  constructor(public auth: AuthService, public me: MeService, public upgrade: UpgradePromptService) {}
+  private particlesOn?: Subscription;
+  private stopParticles?: () => void;
+
+  constructor(
+    public auth: AuthService,
+    public me: MeService,
+    public upgrade: UpgradePromptService,
+    private particles: ParticlesPreferenceService,
+    private host: ElementRef<HTMLElement>,
+    private zone: NgZone,
+  ) {}
 
   ngOnInit(): void {
     this.me.refresh(); // fresh plan/usage for whoever just signed in
+    this.particlesOn = this.particles.on$.subscribe((on) => {
+      this.stopParticles?.();
+      this.stopParticles = on
+        ? startAfterFirstPaint(this.zone, () => import('../experience/backdrop'), ({ startBackdrop }) => startBackdrop(this.host.nativeElement))
+        : undefined;
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.particlesOn?.unsubscribe();
+    this.stopParticles?.();
   }
 
   @HostListener('document:keydown.escape')

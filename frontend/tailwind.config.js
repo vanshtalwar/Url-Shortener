@@ -3,7 +3,9 @@ const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./src/**/*.{html,ts}'],
+  // cursor.ts holds plain CSS in a string, not class names: scanned, its words (ring, shadow, blur…) would become
+  // utilities in the global stylesheet.
+  content: ['./src/**/*.{html,ts}', '!./src/app/marketing/cursor.ts'],
   darkMode: 'class',
   theme: {
     extend: {

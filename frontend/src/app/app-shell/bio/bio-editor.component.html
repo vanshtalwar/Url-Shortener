@@ -18,6 +18,17 @@
       <a zButton routerLink="/app/billing" size="sm">Upgrade</a>
     </div>
 
+    <!-- No page yet: links hanging in a column, like the list on a bio page -->
+    <z-card *ngIf="!published" class="mt-6 flex items-center gap-6">
+      <z-scene kind="stack" class="flex h-36 w-24 shrink-0 items-center justify-center">
+        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white shadow-glow" aria-hidden="true"><z-icon name="sparkles" [size]="22"></z-icon></div>
+      </z-scene>
+      <div class="min-w-0">
+        <h2 class="text-lg font-semibold">No page yet</h2>
+        <p class="mt-1 text-sm text-muted">Pick a handle and add your best short links. Your page goes live at /&#64;handle when you publish.</p>
+      </div>
+    </z-card>
+
     <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
       <!-- Editor -->
       <form class="min-w-0 space-y-6" (ngSubmit)="save()">

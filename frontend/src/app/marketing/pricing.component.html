@@ -1,5 +1,10 @@
-<section class="mx-auto max-w-6xl px-4 pb-8 pt-16 text-center lg:pt-24">
-  <h1 class="text-4xl font-bold sm:text-5xl">Simple pricing</h1>
+<!--
+  Pricing (prompts/zelqit-frontend.md §4, X8): one fixed palette (cream, amber accent); the 3D link settles in the
+  data-xp-anchor box above the Pro card (experience/pricing-page.ts). Particles stay off over the table and FAQ.
+-->
+<section data-palette="pricing" aria-labelledby="pricing-page-title">
+  <div class="mx-auto max-w-6xl px-4 pb-8 pt-16 text-center lg:pt-24">
+  <h1 id="pricing-page-title" class="xp-headline text-5xl sm:text-6xl">Simple <em class="xp-accent">pricing</em></h1>
   <p class="mx-auto mt-4 max-w-xl text-lg text-muted">Start free. Go Pro for unlimited links, full history and every feature.</p>
 
   <div class="mt-8 inline-flex rounded-xl border border-line bg-surface p-1" role="radiogroup" aria-label="Billing period">
@@ -10,9 +15,9 @@
       Yearly <span class="ml-1 text-xs opacity-90">· {{ monthsFree }} months free</span>
     </button>
   </div>
-</section>
+  </div>
 
-<section class="mx-auto grid max-w-4xl gap-4 px-4 md:grid-cols-2">
+  <div class="mx-auto grid max-w-4xl items-end gap-4 px-4 pb-4 md:grid-cols-2">
   <z-card class="flex flex-col">
     <h2 class="text-lg font-semibold">Free</h2>
     <p class="mt-3 font-display text-5xl font-bold">₹0</p>
@@ -26,7 +31,11 @@
     <a *ngIf="auth.isLoggedIn()" zButton routerLink="/app" variant="secondary" class="mt-8 w-full">Go to dashboard</a>
   </z-card>
 
-  <z-card class="relative flex flex-col border-brand-glow/60 shadow-glow">
+  <div>
+  <div data-xp-anchor="pricing" class="relative mx-auto h-24 w-48" aria-hidden="true">
+    <app-stand-in moment="pricing"></app-stand-in>
+  </div>
+  <z-card class="relative flex flex-col border-tint/60">
     <z-badge tone="pro" class="absolute right-6 top-6">Pro</z-badge>
     <h2 class="text-lg font-semibold">Pro</h2>
     <p class="mt-3 font-display text-5xl font-bold">
@@ -42,9 +51,12 @@
     <a *ngIf="!auth.isLoggedIn()" zButton routerLink="/signup" class="mt-8 w-full">Start free, upgrade later</a>
     <a *ngIf="auth.isLoggedIn()" zButton routerLink="/app/billing" [queryParams]="{ interval: interval }" class="mt-8 w-full">Upgrade to Pro</a>
   </z-card>
+  </div>
+  </div>
 </section>
 
-<section class="mx-auto max-w-4xl px-4 py-16" aria-labelledby="compare-title">
+<section data-palette="pricing" data-xp-quiet aria-labelledby="compare-title">
+  <div class="mx-auto max-w-4xl px-4 py-16">
   <h2 id="compare-title" class="text-2xl font-bold">Compare plans</h2>
   <!-- relative: keeps the absolutely-positioned sr-only labels inside the scroller -->
   <div class="relative mt-6 overflow-x-auto rounded-2xl border border-line bg-surface">
@@ -62,9 +74,11 @@
     </table>
   </div>
   <p class="mt-3 text-xs text-muted">Prices in Indian rupees. Applicable taxes may be added. Payments are processed by Razorpay.</p>
+  </div>
 </section>
 
-<section class="mx-auto max-w-3xl px-4 pb-20" aria-labelledby="billing-faq-title">
+<section data-palette="pricing" data-xp-quiet aria-labelledby="billing-faq-title">
+  <div class="mx-auto max-w-3xl px-4 pb-20">
   <h2 id="billing-faq-title" class="text-2xl font-bold">Billing questions</h2>
   <div class="mt-6 divide-y divide-line rounded-2xl border border-line bg-surface">
     <details *ngFor="let item of faqs" class="group px-5 py-4">
@@ -75,4 +89,5 @@
     </details>
   </div>
   <p class="mt-6 text-sm text-muted">Read the <a routerLink="/legal/refunds" class="text-accent underline underline-offset-2">Refund &amp; Cancellation Policy</a>.</p>
+  </div>
 </section>

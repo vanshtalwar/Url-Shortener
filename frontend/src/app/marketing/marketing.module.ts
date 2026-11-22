@@ -5,13 +5,14 @@ import { RouterModule, Routes } from '@angular/router';
 import { UiModule } from '../ui/ui.module';
 import { MarketingLayoutComponent } from './marketing-layout.component';
 import { LandingComponent } from './landing.component';
-import { FeaturesComponent } from './features.component';
+import { FeatureCopyComponent, FeaturesComponent } from './features.component';
 import { PricingComponent } from './pricing.component';
 import { AboutComponent } from './about.component';
 import { ContactComponent } from './contact.component';
 import { LegalComponent } from './legal.component';
 import { BlogIndexComponent } from './blog-index.component';
 import { BlogArticleComponent } from './blog-article.component';
+import { StandInComponent } from './stand-in.component';
 
 const routes: Routes = [
   {
@@ -35,7 +36,7 @@ const routes: Routes = [
 @NgModule({
   declarations: [
     MarketingLayoutComponent, LandingComponent, FeaturesComponent, PricingComponent, AboutComponent, ContactComponent, LegalComponent,
-    BlogIndexComponent, BlogArticleComponent,
+    BlogIndexComponent, BlogArticleComponent, StandInComponent, FeatureCopyComponent,
   ],
   imports: [CommonModule, FormsModule, UiModule, RouterModule.forChild(routes)],
 })

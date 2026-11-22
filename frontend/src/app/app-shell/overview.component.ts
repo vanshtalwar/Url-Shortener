@@ -7,7 +7,7 @@ import { MeService } from '../me.service';
 import { UpgradePromptService } from '../upgrade-prompt.service';
 
 type Range = 7 | 30 | 90;
-type State = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: Overview };
+type State = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: Overview; today: number };
 
 @Component({
   selector: 'app-overview',
@@ -20,7 +20,8 @@ export class OverviewComponent {
   readonly state$ = this.range$.pipe(
     switchMap((days) =>
       this.http.get<Overview>(`${environment.apiUrl}/api/stats/overview`, { params: { days } }).pipe(
-        map((data): State => ({ status: 'ready', data })),
+        // The series always ends with today (UTC).
+        map((data): State => ({ status: 'ready', data, today: data.clicksPerDay[data.clicksPerDay.length - 1]?.count ?? 0 })),
         catchError(() => of<State>({ status: 'error' })),
         startWith<State>({ status: 'loading' }),
       ),

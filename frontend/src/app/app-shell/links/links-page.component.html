@@ -40,7 +40,9 @@
       <ng-container *ngIf="state.status === 'ready'">
         <!-- Empty states -->
         <z-card *ngIf="state.links.length === 0 && !hasFilters" class="mt-6 py-12 text-center">
-          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white shadow-glow"><z-icon name="link" [size]="22"></z-icon></div>
+          <z-scene kind="chain" class="mx-auto flex h-28 w-56 items-center justify-center">
+            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white shadow-glow" aria-hidden="true"><z-icon name="link" [size]="22"></z-icon></div>
+          </z-scene>
           <h2 class="mt-4 text-lg font-semibold">No links yet</h2>
           <p class="mt-1 text-sm text-muted">Shorten your first URL to start tracking clicks.</p>
           <button zButton class="mt-6" (click)="editing = { link: null, initialUrl: '' }"><z-icon name="plus" [size]="16"></z-icon>New link</button>

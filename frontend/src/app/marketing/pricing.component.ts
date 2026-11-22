@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, NgZone, OnDestroy } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
+import { followSectionPalette, startAfterFirstPaint } from '../experience-loader';
 import { PLAN_FEATURES, PRICES, formatInr } from './plans';
 
 type Interval = 'monthly' | 'yearly';
@@ -9,7 +10,7 @@ type Interval = 'monthly' | 'yearly';
   templateUrl: './pricing.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PricingComponent {
+export class PricingComponent implements AfterViewInit, OnDestroy {
   interval: Interval = 'yearly';
   readonly features = PLAN_FEATURES;
   readonly monthly = formatInr(PRICES.monthly);
@@ -24,7 +25,22 @@ export class PricingComponent {
     { q: 'What happens to my links if I stop paying?', a: 'They keep working. Pro-only settings become read-only and analytics older than 30 days are hidden until you upgrade again.' },
   ];
 
-  constructor(public auth: AuthService) {}
+  private stopExperience?: () => void;
+  private stopPalette?: () => void;
+
+  constructor(public auth: AuthService, private host: ElementRef<HTMLElement>, private zone: NgZone) {}
+
+  /** Fixed cream palette; the 3D link (its own chunk) settles above the Pro card after first paint. */
+  ngAfterViewInit(): void {
+    const page = this.host.nativeElement;
+    this.stopPalette = followSectionPalette(this.zone, page);
+    this.stopExperience = startAfterFirstPaint(this.zone, () => import('../experience/pricing-page'), ({ startPricing }) => startPricing(page));
+  }
+
+  ngOnDestroy(): void {
+    this.stopExperience?.();
+    this.stopPalette?.();
+  }
 
   /** "✓" / "—" / a limit string, for the comparison table. Pure. */
   cell(value: boolean | string): string {

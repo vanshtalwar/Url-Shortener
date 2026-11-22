@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component } from '@angular/core';
 import { MeService } from '../../me.service';
+import { ParticlesPreferenceService } from '../../ui/particles-preference.service';
 import { ThemePreference, ThemeService } from '../../ui/theme.service';
 import { ToastService } from '../../ui/toast.service';
 import { BUSINESS } from '../../marketing/business';
@@ -26,7 +27,13 @@ export class SettingsComponent {
   saving = false;
   error = '';
 
-  constructor(public me: MeService, public theme: ThemeService, private toast: ToastService, private cdr: ChangeDetectorRef) {}
+  constructor(
+    public me: MeService,
+    public theme: ThemeService,
+    public particles: ParticlesPreferenceService,
+    private toast: ToastService,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   savePassword(hasPassword: boolean): void {
     this.saving = true;

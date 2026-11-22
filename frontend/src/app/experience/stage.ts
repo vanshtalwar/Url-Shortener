@@ -10,7 +10,7 @@ const HALF_FOV_TAN = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
 export type Layer = 'front' | 'back';
 
 /**
- * One renderer, scene and camera for the whole page. A single WebGL context: environment maps and shaders belong to
+ * One renderer, scene and camera for the whole page (or for one box on a dashboard page). A single WebGL context: environment maps and shaders belong to
  * a context, so a second canvas would double GPU memory and start-up work. Live, the canvas is fixed over the
  * viewport and moves in front of or behind the HTML; for stills it renders off-screen and is copied out.
  */
@@ -44,6 +44,12 @@ export class Stage {
     Object.assign(this.canvas.style, { position: 'fixed', top: '0', left: '0', width: '100%', height: '100vh', pointerEvents: 'none' });
     this.setLayer(layer);
     parent.appendChild(this.canvas);
+  }
+
+  /** In a box (the dashboard's cards): fills `host`, which must be positioned; sized with resize(). */
+  embed(host: HTMLElement): void {
+    Object.assign(this.canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none' });
+    host.appendChild(this.canvas);
   }
 
   /** Front sits under the marketing header (z-40) so it still blurs the 3D behind it. */
