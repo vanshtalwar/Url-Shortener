@@ -4,3 +4,8 @@ dist/
 .env
 coverage/
 .DS_Store
+
+# Local-only working notes and Claude Code config
+PLAN.md
+context.md
+.claude/

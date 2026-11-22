@@ -5,8 +5,6 @@ Shorten links (random code or custom alias, optional expiry), edit/delete them, 
 - **backend/** — Node + Express 5 + TypeScript + MongoDB (Mongoose). Serves the API and the short-link redirects.
 - **frontend/** — Angular 14.
 
-See [PLAN.md](PLAN.md) for the design and [context.md](context.md) for current status and build decisions.
-
 ## 1. One-time setup
 
 ### MongoDB Atlas
