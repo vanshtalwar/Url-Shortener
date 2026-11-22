@@ -1,22 +1,23 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { AuthGuard } from './auth/auth.guard';
-import { LoginComponent } from './pages/login/login.component';
-import { LinksComponent } from './pages/links/links.component';
+import { authMatcher, bioMatcher } from './route-matchers';
 
+// Each area is its own lazy chunk, so the landing page never downloads the dashboard.
 const routes: Routes = [
-  { path: 'login', component: LoginComponent },
-  { path: 'links', component: LinksComponent, canActivate: [AuthGuard] },
-  {
-    path: 'links/:id',
-    canActivate: [AuthGuard],
-    loadChildren: () => import('./pages/link-detail/link-detail.module').then((m) => m.LinkDetailModule),
-  },
-  { path: '**', redirectTo: 'links' },
+  // Old URLs from before the redesign.
+  { path: 'links', pathMatch: 'full', redirectTo: 'app/links' },
+  { path: 'links/:id', redirectTo: 'app/links/:id' },
+
+  { path: 'app', canActivate: [AuthGuard], loadChildren: () => import('./app-shell/app-shell.module').then((m) => m.AppShellModule) },
+  { matcher: authMatcher, loadChildren: () => import('./auth-pages/auth-pages.module').then((m) => m.AuthPagesModule) },
+  { matcher: bioMatcher, loadChildren: () => import('./bio-page/bio-page.module').then((m) => m.BioPageModule) },
+  { path: '', loadChildren: () => import('./marketing/marketing.module').then((m) => m.MarketingModule) },
+  { path: '**', redirectTo: '' },
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
+  imports: [RouterModule.forRoot(routes, { scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' })],
+  exports: [RouterModule],
 })
-export class AppRoutingModule { }
+export class AppRoutingModule {}

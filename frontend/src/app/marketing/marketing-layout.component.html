@@ -1,0 +1,66 @@
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-surface focus:px-4 focus:py-2">Skip to content</a>
+<header class="sticky top-0 z-40 border-b border-line/60 bg-canvas/60 backdrop-blur-xl">
+  <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
+    <a routerLink="/" class="text-ink" aria-label="Zelqit home"><z-logo></z-logo></a>
+
+    <nav class="hidden items-center gap-1 md:flex" aria-label="Main">
+      <a *ngFor="let item of nav" [routerLink]="item.path" routerLinkActive="text-ink" [routerLinkActiveOptions]="{ exact: false }"
+         class="rounded-xl px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-ink">{{ item.label }}</a>
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <z-theme-toggle></z-theme-toggle>
+      <ng-container *ngIf="auth.isLoggedIn(); else guest">
+        <a zButton routerLink="/app" size="sm" class="hidden sm:inline-flex">Dashboard</a>
+      </ng-container>
+      <ng-template #guest>
+        <a zButton routerLink="/login" variant="ghost" size="sm" class="hidden sm:inline-flex">Log in</a>
+        <a zButton routerLink="/signup" size="sm" class="hidden sm:inline-flex">Start free</a>
+      </ng-template>
+      <button zButton variant="ghost" size="sm" class="!px-2 md:hidden" [attr.aria-expanded]="menuOpen" aria-controls="mobile-menu"
+              [attr.aria-label]="menuOpen ? 'Close menu' : 'Open menu'" (click)="menuOpen = !menuOpen">
+        <z-icon [name]="menuOpen ? 'x' : 'menu'"></z-icon>
+      </button>
+    </div>
+  </div>
+
+  <nav *ngIf="menuOpen" id="mobile-menu" class="border-t border-line px-4 pb-4 pt-2 md:hidden" aria-label="Mobile">
+    <a *ngFor="let item of nav" [routerLink]="item.path" (click)="menuOpen = false"
+       class="block rounded-xl px-3 py-2.5 text-sm font-medium text-ink hover:bg-surface-2">{{ item.label }}</a>
+    <div class="mt-3 grid grid-cols-2 gap-2">
+      <ng-container *ngIf="auth.isLoggedIn(); else guestMobile">
+        <a zButton routerLink="/app" class="col-span-2" (click)="menuOpen = false">Dashboard</a>
+      </ng-container>
+      <ng-template #guestMobile>
+        <a zButton routerLink="/login" variant="secondary" (click)="menuOpen = false">Log in</a>
+        <a zButton routerLink="/signup" (click)="menuOpen = false">Start free</a>
+      </ng-template>
+    </div>
+  </nav>
+</header>
+
+<main id="main">
+  <router-outlet></router-outlet>
+</main>
+
+<footer class="border-t border-line">
+  <div class="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-5">
+    <div class="lg:col-span-2">
+      <z-logo></z-logo>
+      <p class="mt-3 max-w-xs text-sm text-muted">Short links with analytics you can trust — unique visitors, sources, devices and countries.</p>
+    </div>
+    <div *ngFor="let column of footer">
+      <h2 class="text-sm font-semibold">{{ column.title }}</h2>
+      <ul class="mt-3 space-y-2">
+        <li *ngFor="let link of column.links"><a [routerLink]="link.path" class="text-sm text-muted transition-colors hover:text-ink">{{ link.label }}</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-line">
+    <div class="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-muted sm:flex-row sm:justify-between">
+      <p>© {{ year }} Zelqit. All rights reserved.</p>
+      <p>This product includes GeoLite2 data created by MaxMind, available from
+        <a href="https://www.maxmind.com" class="underline hover:text-ink" rel="noopener" target="_blank">maxmind.com</a>.</p>
+    </div>
+  </div>
+</footer>

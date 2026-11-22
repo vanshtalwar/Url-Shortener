@@ -1,0 +1,111 @@
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="flex items-center gap-2 text-2xl font-bold">Link-in-bio <z-badge *ngIf="(me.me$ | async)?.entitlements?.can?.bio === false" tone="pro" [locked]="true">Pro</z-badge></h1>
+    <p class="mt-1 text-sm text-muted">One public page with your best links. Every tap is tracked through your short links.</p>
+  </div>
+  <div *ngIf="published" class="flex flex-wrap items-center gap-2">
+    <a zButton variant="secondary" size="sm" [href]="publicUrl" target="_blank" rel="noopener"><z-icon name="external" [size]="14"></z-icon>View page</a>
+    <button zButton variant="secondary" size="sm" (click)="copyUrl()"><z-icon name="copy" [size]="14"></z-icon>Copy link</button>
+  </div>
+</div>
+
+<div *ngIf="loading" class="mt-6 h-96 animate-pulse rounded-2xl bg-surface-2" aria-busy="true"></div>
+
+<ng-container *ngIf="!loading">
+  <ng-container *ngIf="me.me$ | async as me">
+    <div *ngIf="!me.entitlements.can.bio" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-glow/40 bg-brand-glow/10 px-4 py-3 text-sm">
+      <span>{{ published ? 'Your page stays online. Upgrade to edit it.' : 'Link-in-bio is part of Zelqit Pro.' }}</span>
+      <a zButton routerLink="/app/billing" size="sm">Upgrade</a>
+    </div>
+
+    <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
+      <!-- Editor -->
+      <form class="min-w-0 space-y-6" (ngSubmit)="save()">
+        <fieldset class="space-y-6" [disabled]="!me.entitlements.can.bio">
+          <z-card class="space-y-4">
+            <div>
+              <label for="handle" class="mb-1.5 block text-sm font-medium">Handle</label>
+              <div class="flex items-center rounded-xl border border-line bg-surface-2 pl-3 focus-within:ring-2 focus-within:ring-brand-glow/40">
+                <span class="text-sm text-muted">/&#64;</span>
+                <input id="handle" name="handle" class="w-full bg-transparent px-1 py-2 text-sm outline-none" maxlength="30" autocomplete="off"
+                       [(ngModel)]="form.handle" (blur)="normalizeHandle()" aria-describedby="handle-hint" />
+              </div>
+              <p id="handle-hint" class="mt-1.5 text-xs" [class.text-muted]="!handleError" [class.text-danger]="handleError">{{ handleError || handleHint }}</p>
+            </div>
+            <div>
+              <label for="bio-title" class="mb-1.5 block text-sm font-medium">Title</label>
+              <input id="bio-title" name="title" zInput maxlength="60" placeholder="Your name or brand" [(ngModel)]="form.title" />
+            </div>
+            <div>
+              <label for="bio-description" class="mb-1.5 block text-sm font-medium">Description <span class="font-normal text-muted">(optional)</span></label>
+              <textarea id="bio-description" name="description" zInput rows="2" maxlength="160" [(ngModel)]="form.description"></textarea>
+            </div>
+            <div>
+              <p class="mb-1.5 text-sm font-medium" id="theme-label">Theme</p>
+              <div class="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="theme-label">
+                <button *ngFor="let t of themes" type="button" role="radio" [attr.aria-checked]="form.theme === t.id" (click)="form.theme = t.id"
+                        class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors"
+                        [ngClass]="form.theme === t.id ? 'border-brand-glow ring-2 ring-brand-glow/30' : 'border-line hover:bg-surface-2'">
+                  <span class="h-5 w-5 rounded-full" [ngClass]="t.swatch" aria-hidden="true"></span>{{ t.label }}
+                </button>
+              </div>
+            </div>
+          </z-card>
+
+          <z-card>
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-semibold">Links on your page</h2>
+              <span class="text-xs text-muted">{{ form.links.length }} / {{ maxLinks }}</span>
+            </div>
+            <p *ngIf="form.links.length === 0" class="mt-3 text-sm text-muted">Add some of your short links below.</p>
+            <ul class="mt-3 space-y-2">
+              <li *ngFor="let item of form.links; let i = index; let first = first; let last = last" class="flex items-center gap-2 rounded-xl bg-surface-2 p-2">
+                <div class="flex flex-col">
+                  <button type="button" class="rounded p-0.5 text-muted hover:text-ink disabled:opacity-30" [disabled]="first" [attr.aria-label]="'Move ' + item.label + ' up'" (click)="move(i, -1)">▲</button>
+                  <button type="button" class="rounded p-0.5 text-muted hover:text-ink disabled:opacity-30" [disabled]="last" [attr.aria-label]="'Move ' + item.label + ' down'" (click)="move(i, 1)">▼</button>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <input [name]="'label-' + i" zInput class="!bg-surface" maxlength="60" [(ngModel)]="item.label" [attr.aria-label]="'Label for ' + codeOf(item.linkId)" />
+                  <p class="mt-1 truncate font-mono text-xs text-muted">{{ codeOf(item.linkId) }}</p>
+                </div>
+                <button type="button" zButton variant="ghost" size="sm" class="!px-2" [attr.aria-label]="'Remove ' + item.label" (click)="removeLink(i)"><z-icon name="trash" [size]="14"></z-icon></button>
+              </li>
+            </ul>
+            <div *ngIf="form.links.length < maxLinks" class="mt-3 flex gap-2">
+              <select name="addLink" zInput class="min-w-0" aria-label="Add one of your links" [(ngModel)]="addLinkId">
+                <option value="">{{ available.length ? 'Choose a link to add…' : 'All your links are on the page' }}</option>
+                <option *ngFor="let l of available" [value]="l.id">{{ l.code }} — {{ l.url }}</option>
+              </select>
+              <button type="button" zButton variant="secondary" [disabled]="!addLinkId" (click)="addLink()"><z-icon name="plus" [size]="14"></z-icon>Add</button>
+            </div>
+          </z-card>
+        </fieldset>
+
+        <p *ngIf="error" role="alert" class="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{{ error }}</p>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <button *ngIf="published" type="button" zButton variant="danger" (click)="confirmingDelete = true">Take page down</button>
+          <button *ngIf="me.entitlements.can.bio" type="submit" zButton class="ml-auto" [loading]="saving" [disabled]="!form.handle || !form.title.trim()">
+            {{ published ? 'Save changes' : 'Publish page' }}
+          </button>
+        </div>
+      </form>
+
+      <!-- Live preview in a phone frame -->
+      <div class="min-w-0 lg:sticky lg:top-24 lg:self-start">
+        <p class="mb-2 text-center text-xs text-muted">Preview</p>
+        <div class="mx-auto h-[600px] w-[300px] max-w-full overflow-hidden rounded-[2.5rem] border-[10px] border-[#15121f] shadow-soft">
+          <app-bio-view class="h-full overflow-y-auto" [title]="form.title" [description]="form.description" [theme]="form.theme" [links]="preview"></app-bio-view>
+        </div>
+      </div>
+    </div>
+
+    <z-modal *ngIf="confirmingDelete" label="Take your page down" (closed)="confirmingDelete = false">
+      <h2 class="text-lg font-semibold">Take your page down?</h2>
+      <p class="mt-2 text-sm text-muted">{{ publicUrl }} will stop working. Your short links aren't affected.{{ me.entitlements.can.bio ? '' : ' On Free you won\'t be able to publish it again without upgrading.' }}</p>
+      <div class="mt-6 flex justify-end gap-2">
+        <button zButton variant="ghost" (click)="confirmingDelete = false">Cancel</button>
+        <button zButton variant="danger" (click)="remove()">Take it down</button>
+      </div>
+    </z-modal>
+  </ng-container>
+</ng-container>

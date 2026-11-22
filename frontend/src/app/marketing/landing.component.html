@@ -1,0 +1,161 @@
+<!-- Hero -->
+<section class="relative overflow-hidden">
+  <div class="pointer-events-none absolute inset-x-0 -top-40 mx-auto h-[560px] max-w-4xl rounded-full bg-brand opacity-[0.18] blur-3xl" aria-hidden="true"></div>
+  <div class="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-16 lg:grid-cols-2 lg:pb-24 lg:pt-24">
+    <div>
+      <z-badge tone="neutral">Short links · real analytics</z-badge>
+      <h1 class="mt-5 text-4xl font-bold leading-[1.1] sm:text-5xl lg:text-6xl">
+        Short links.<br /><span class="bg-brand bg-clip-text text-transparent">Real answers.</span>
+      </h1>
+      <p class="mt-5 max-w-lg text-lg text-muted">
+        Zelqit turns long URLs into clean short links and shows you who actually clicks — unique visitors, sources,
+        devices and countries, with bots filtered out.
+      </p>
+
+      <form class="mt-8 flex max-w-lg flex-col gap-2 sm:flex-row" (ngSubmit)="startWithUrl()" aria-label="Try Zelqit">
+        <label for="demo-url" class="sr-only">Long URL to shorten</label>
+        <input id="demo-url" name="demoUrl" type="url" zInput class="h-12 !text-base" placeholder="Paste a long link…" [(ngModel)]="demoUrl" />
+        <button zButton size="lg" type="submit" class="shrink-0">Shorten free<z-icon name="arrow-right" [size]="18"></z-icon></button>
+      </form>
+      <p class="mt-3 text-sm text-muted">Free plan · no card needed · <a routerLink="/pricing" class="text-accent underline underline-offset-2">see pricing</a></p>
+    </div>
+
+    <app-hero-scene class="h-[320px] sm:h-[420px] lg:h-[520px]"></app-hero-scene>
+  </div>
+</section>
+
+<!-- Feature strip: scrolls slowly, pauses on hover, still with reduced motion -->
+<section class="border-y border-line bg-surface/50 py-5" aria-label="Highlights">
+  <div class="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+    <ul class="flex w-max animate-marquee gap-3 group-hover:[animation-play-state:paused]">
+      <li *ngFor="let item of strip.concat(strip); let i = index" class="whitespace-nowrap rounded-full border border-line bg-surface px-4 py-1.5 text-sm text-muted"
+          [attr.aria-hidden]="i >= strip.length ? 'true' : null">{{ item }}</li>
+    </ul>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="mx-auto max-w-6xl px-4 py-16 lg:py-24" aria-labelledby="features-title">
+  <div class="max-w-2xl">
+    <h2 id="features-title" class="text-3xl font-bold sm:text-4xl">Everything a short link should do</h2>
+    <p class="mt-3 text-lg text-muted">Built for creators, small teams and anyone who wants to know whether their links work.</p>
+  </div>
+  <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <z-card *ngFor="let f of features" class="transition-colors hover:border-brand-glow/50">
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white shadow-glow"><z-icon [name]="f.icon" [size]="20"></z-icon></div>
+      <h3 class="mt-4 text-lg font-semibold">{{ f.title }}</h3>
+      <p class="mt-2 text-sm leading-relaxed text-muted">{{ f.body }}</p>
+    </z-card>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="border-y border-line bg-surface/50" aria-labelledby="how-title">
+  <div class="mx-auto max-w-6xl px-4 py-16 lg:py-24">
+    <h2 id="how-title" class="text-3xl font-bold sm:text-4xl">How it works</h2>
+    <ol class="mt-10 grid gap-6 md:grid-cols-3">
+      <li *ngFor="let step of steps; let i = index" class="relative">
+        <span class="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface font-display font-bold text-accent">{{ i + 1 }}</span>
+        <h3 class="mt-4 text-lg font-semibold">{{ step.title }}</h3>
+        <p class="mt-2 text-sm text-muted">{{ step.body }}</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- Analytics showcase (illustrative) -->
+<section class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 lg:grid-cols-2 lg:py-24" aria-labelledby="analytics-title">
+  <div>
+    <h2 id="analytics-title" class="text-3xl font-bold sm:text-4xl">Know what's working</h2>
+    <ul class="mt-6 space-y-3 text-muted">
+      <li class="flex gap-3"><z-icon name="check" class="mt-0.5 text-accent"></z-icon>Clicks and unique visitors for every day</li>
+      <li class="flex gap-3"><z-icon name="check" class="mt-0.5 text-accent"></z-icon>Where people came from, and on which device</li>
+      <li class="flex gap-3"><z-icon name="check" class="mt-0.5 text-accent"></z-icon>Country and city breakdowns on Pro</li>
+      <li class="flex gap-3"><z-icon name="check" class="mt-0.5 text-accent"></z-icon>Bots counted separately, never mixed in</li>
+    </ul>
+    <a zButton routerLink="/features" variant="secondary" class="mt-8">Explore features<z-icon name="arrow-right" [size]="16"></z-icon></a>
+  </div>
+
+  <z-card class="!p-5" aria-label="Sample analytics dashboard">
+    <div class="flex items-center justify-between">
+      <p class="text-sm font-medium">zelq.it/spring-sale</p>
+      <z-badge>Sample data</z-badge>
+    </div>
+    <div class="mt-4 grid grid-cols-3 gap-3">
+      <div class="rounded-xl bg-surface-2 p-3"><p class="text-xs text-muted">Clicks</p><p class="font-display text-xl font-bold">1,248</p></div>
+      <div class="rounded-xl bg-surface-2 p-3"><p class="text-xs text-muted">Unique</p><p class="font-display text-xl font-bold">903</p></div>
+      <div class="rounded-xl bg-surface-2 p-3"><p class="text-xs text-muted">Bots</p><p class="font-display text-xl font-bold">57</p></div>
+    </div>
+    <div class="mt-5 flex h-32 items-end gap-1.5" aria-hidden="true">
+      <div *ngFor="let bar of sampleBars" class="flex-1 rounded-t-md bg-brand opacity-90" [style.height.%]="barHeight(bar)"></div>
+    </div>
+    <div class="mt-5 space-y-2">
+      <div *ngFor="let s of sampleSources" class="flex items-center gap-3 text-sm">
+        <span class="w-20 text-muted">{{ s.label }}</span>
+        <div class="h-2 flex-1 overflow-hidden rounded-full bg-surface-2"><div class="h-full rounded-full bg-brand" [style.width.%]="s.share"></div></div>
+        <span class="w-10 text-right tabular-nums">{{ s.share }}%</span>
+      </div>
+    </div>
+  </z-card>
+</section>
+
+<!-- Security -->
+<section class="border-y border-line bg-surface/50" aria-labelledby="security-title">
+  <div class="mx-auto max-w-6xl px-4 py-16 lg:py-24">
+    <h2 id="security-title" class="text-3xl font-bold sm:text-4xl">Private and protected by default</h2>
+    <div class="mt-10 grid gap-4 md:grid-cols-3">
+      <div *ngFor="let s of security" class="rounded-2xl border border-line bg-surface p-6">
+        <z-icon [name]="s.icon" [size]="22" class="text-accent"></z-icon>
+        <h3 class="mt-4 font-semibold">{{ s.title }}</h3>
+        <p class="mt-2 text-sm text-muted">{{ s.body }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing teaser -->
+<section class="mx-auto max-w-6xl px-4 py-16 lg:py-24" aria-labelledby="pricing-title">
+  <div class="text-center">
+    <h2 id="pricing-title" class="text-3xl font-bold sm:text-4xl">Start free. Upgrade when it pays off.</h2>
+    <p class="mt-3 text-lg text-muted">Pro is {{ proMonthly }}/month, or two months free when you pay yearly.</p>
+  </div>
+  <div class="mx-auto mt-10 grid max-w-3xl gap-4 md:grid-cols-2">
+    <z-card>
+      <h3 class="font-semibold">Free</h3>
+      <p class="mt-2 font-display text-4xl font-bold">₹0</p>
+      <p class="mt-2 text-sm text-muted">25 new links a month and 30 days of analytics.</p>
+      <a zButton routerLink="/signup" variant="secondary" class="mt-6 w-full">Start free</a>
+    </z-card>
+    <z-card class="relative border-brand-glow/60 shadow-glow">
+      <z-badge tone="pro" class="absolute right-5 top-5">Most popular</z-badge>
+      <h3 class="font-semibold">Pro</h3>
+      <p class="mt-2 font-display text-4xl font-bold">{{ proMonthly }}<span class="text-base font-medium text-muted">/month</span></p>
+      <p class="mt-2 text-sm text-muted">Unlimited links, full history, countries, A/B splits and more.</p>
+      <a zButton routerLink="/pricing" class="mt-6 w-full">See all Pro features</a>
+    </z-card>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="border-t border-line" aria-labelledby="faq-title">
+  <div class="mx-auto max-w-3xl px-4 py-16 lg:py-24">
+    <h2 id="faq-title" class="text-3xl font-bold sm:text-4xl">Questions</h2>
+    <div class="mt-8 divide-y divide-line rounded-2xl border border-line bg-surface">
+      <details *ngFor="let item of faqs" class="group px-5 py-4">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-medium">
+          {{ item.q }}<z-icon name="chevron-down" [size]="18" class="text-muted transition-transform group-open:rotate-180"></z-icon>
+        </summary>
+        <p class="mt-3 text-sm leading-relaxed text-muted">{{ item.a }}</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<section class="px-4 pb-20">
+  <div class="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-brand px-6 py-14 text-center text-white shadow-glow sm:px-12">
+    <h2 class="text-3xl font-bold sm:text-4xl">Your next link could tell you more.</h2>
+    <p class="mx-auto mt-3 max-w-xl text-white/80">Create a free account in under a minute.</p>
+    <a zButton routerLink="/signup" variant="secondary" size="lg" class="mt-8 !border-white/20 !bg-white !text-[#14121f] hover:!bg-white/90">Start free</a>
+  </div>
+</section>

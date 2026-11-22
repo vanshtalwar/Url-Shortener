@@ -1,0 +1,71 @@
+<div class="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
+  <!-- Sidebar: fixed drawer on small screens, static column on large ones -->
+  <div *ngIf="sidebarOpen" class="fixed inset-0 z-40 bg-black/40 lg:hidden" (click)="sidebarOpen = false" aria-hidden="true"></div>
+  <aside class="fixed inset-y-0 left-0 z-50 w-60 -translate-x-full border-r border-line bg-surface transition-transform lg:static lg:translate-x-0"
+         [class.translate-x-0]="sidebarOpen" [class.-translate-x-full]="!sidebarOpen" aria-label="App navigation">
+    <div class="flex h-16 items-center px-5">
+      <a routerLink="/" class="text-ink" aria-label="Zelqit home"><z-logo></z-logo></a>
+    </div>
+    <nav class="space-y-1 px-3">
+      <a *ngFor="let item of nav" [routerLink]="item.path" routerLinkActive="!bg-surface-2 !text-ink"
+         [routerLinkActiveOptions]="{ exact: item.exact }" (click)="sidebarOpen = false"
+         class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-2 hover:text-ink">
+        <z-icon [name]="item.icon" [size]="18"></z-icon>{{ item.label }}
+      </a>
+    </nav>
+    <div *ngIf="me.me$ | async as me" class="absolute inset-x-3 bottom-4 rounded-2xl border border-line bg-surface-2/60 p-4">
+      <ng-container *ngIf="me.entitlements.linkLimitPerMonth !== null; else proPlan">
+        <z-usage-meter label="Links this month" [used]="me.usage.linksThisMonth" [limit]="me.entitlements.linkLimitPerMonth"></z-usage-meter>
+        <a zButton routerLink="/app/billing" size="sm" class="mt-3 w-full"><z-icon name="sparkles" [size]="14"></z-icon>Upgrade to Pro</a>
+      </ng-container>
+      <ng-template #proPlan>
+        <p class="flex items-center gap-2 text-sm font-medium"><z-badge tone="pro">Pro</z-badge>Unlimited links</p>
+      </ng-template>
+    </div>
+  </aside>
+
+  <div class="min-w-0">
+    <header class="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-line bg-canvas/70 px-4 backdrop-blur-xl">
+      <button zButton variant="ghost" size="sm" class="!px-2 lg:hidden" aria-label="Open navigation" (click)="sidebarOpen = true">
+        <z-icon name="menu"></z-icon>
+      </button>
+      <div class="flex-1"></div>
+      <ng-container *ngIf="me.me$ | async as me">
+        <z-badge [tone]="me.plan === 'pro' ? 'pro' : 'neutral'">{{ me.plan === 'pro' ? 'Pro' : 'Free' }}</z-badge>
+      </ng-container>
+      <z-theme-toggle></z-theme-toggle>
+      <div class="relative">
+        <button zButton variant="secondary" size="sm" [attr.aria-expanded]="accountOpen" aria-haspopup="menu" aria-label="Account menu" (click)="accountOpen = !accountOpen">
+          <z-icon name="user" [size]="16" class="sm:hidden"></z-icon>
+          <span class="hidden max-w-[160px] truncate sm:inline">{{ auth.user?.email }}</span>
+          <z-icon name="chevron-down" [size]="16"></z-icon>
+        </button>
+        <div *ngIf="accountOpen" class="fixed inset-0 z-10" (click)="accountOpen = false" aria-hidden="true"></div>
+        <div *ngIf="accountOpen" role="menu" class="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-line bg-surface p-1 shadow-soft">
+          <p class="truncate px-3 py-2 text-xs text-muted sm:hidden">{{ auth.user?.email }}</p>
+          <a routerLink="/app/settings" role="menuitem" (click)="accountOpen = false"
+             class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-surface-2"><z-icon name="settings" [size]="16"></z-icon>Settings</a>
+          <button type="button" zButton variant="ghost" size="sm" role="menuitem" class="w-full !justify-start" (click)="auth.logout()">
+            <z-icon name="logout" [size]="16"></z-icon>Log out
+          </button>
+        </div>
+      </div>
+    </header>
+    <main class="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>
+
+<z-toast-host></z-toast-host>
+
+<z-modal *ngIf="upgrade.reason$ | async as reason" label="Upgrade to Zelqit Pro" (closed)="upgrade.close()">
+  <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand text-white shadow-glow"><z-icon name="sparkles" [size]="20"></z-icon></div>
+  <h2 class="mt-4 text-xl font-bold">Upgrade to Pro</h2>
+  <p class="mt-2 text-sm text-muted">{{ reason }}</p>
+  <p class="mt-2 text-sm text-muted">Pro unlocks unlimited links, full history, countries, folders, UTM presets, A/B splits and link-in-bio.</p>
+  <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+    <button zButton variant="ghost" (click)="upgrade.close()">Not now</button>
+    <a zButton routerLink="/app/billing" (click)="upgrade.close()">See Pro plans</a>
+  </div>
+</z-modal>

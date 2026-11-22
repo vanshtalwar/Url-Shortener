@@ -44,8 +44,14 @@
             "polyfills": "src/polyfills.ts",
             "tsConfig": "tsconfig.app.json",
             "assets": [
-              "src/favicon.ico",
-              "src/assets"
+              "src/favicon.svg",
+              "src/robots.txt",
+              "src/assets",
+              {
+                "glob": "countries-110m.json",
+                "input": "node_modules/world-atlas",
+                "output": "assets/geo"
+              }
             ],
             "styles": [
               "src/styles.css"
@@ -75,7 +81,15 @@
                   "with": "src/environments/environment.prod.ts"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              }
             },
             "development": {
               "buildOptimizer": false,

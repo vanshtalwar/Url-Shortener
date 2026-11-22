@@ -1,0 +1,23 @@
+[
+  {
+    "slug": "how-to-track-link-clicks",
+    "title": "How to track link clicks (and trust the numbers)",
+    "description": "What a click count really measures, why it's often inflated, and how to read link analytics without fooling yourself.",
+    "date": "2026-11-22",
+    "readMinutes": 6
+  },
+  {
+    "slug": "utm-parameters-explained",
+    "title": "UTM parameters explained",
+    "description": "The five UTM tags, how to name them consistently, and the mistakes that quietly ruin campaign reports.",
+    "date": "2026-11-22",
+    "readMinutes": 6
+  },
+  {
+    "slug": "qr-codes-in-campaigns",
+    "title": "Using QR codes in your campaigns",
+    "description": "Where QR codes work, how to make them scan reliably, and how to measure them like any other link.",
+    "date": "2026-11-22",
+    "readMinutes": 5
+  }
+]

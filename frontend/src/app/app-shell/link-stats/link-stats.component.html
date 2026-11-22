@@ -1,0 +1,115 @@
+<a routerLink="/app/links" class="text-sm text-accent hover:underline">← All links</a>
+
+<ng-container *ngIf="state$ | async as state">
+  <div *ngIf="state.status === 'loading'" class="mt-6 space-y-4" aria-busy="true">
+    <div class="h-20 animate-pulse rounded-2xl bg-surface-2"></div>
+    <div class="grid gap-4 sm:grid-cols-3"><div *ngFor="let i of [1, 2, 3]" class="h-28 animate-pulse rounded-2xl bg-surface-2"></div></div>
+    <div class="h-80 animate-pulse rounded-2xl bg-surface-2"></div>
+  </div>
+
+  <z-card *ngIf="state.status === 'missing'" class="mt-6 text-center">
+    <h1 class="text-xl font-semibold">Link not found</h1>
+    <p class="mt-1 text-sm text-muted">It may have been deleted.</p>
+    <a zButton routerLink="/app/links" variant="secondary" class="mt-4">Back to links</a>
+  </z-card>
+
+  <z-card *ngIf="state.status === 'error'" class="mt-6 text-center">
+    <p class="text-muted">Couldn't load the stats.</p>
+    <button zButton variant="secondary" class="mt-4" (click)="retry()">Try again</button>
+  </z-card>
+
+  <ng-container *ngIf="state.status === 'ready'">
+    <ng-container *ngIf="state.stats as s">
+      <!-- Header -->
+      <div class="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="truncate font-mono text-xl font-bold sm:text-2xl">{{ shortUrl(s.link.code) }}</h1>
+            <button zButton variant="ghost" size="sm" class="!px-2" [attr.aria-label]="'Copy ' + shortUrl(s.link.code)" (click)="copy(s.link.code)"><z-icon name="copy" [size]="16"></z-icon></button>
+            <a zButton variant="ghost" size="sm" class="!px-2" [href]="shortUrl(s.link.code)" target="_blank" rel="noopener" aria-label="Open short link"><z-icon name="external" [size]="16"></z-icon></a>
+          </div>
+          <p class="mt-1 truncate text-sm text-muted" [title]="s.link.url">→ {{ s.link.url }}</p>
+        </div>
+        <z-switch label="Include bot clicks" [checked]="(includeBots$ | async) ?? false" (checkedChange)="includeBots$.next($event)"></z-switch>
+      </div>
+
+      <!-- Free history notice -->
+      <div *ngIf="s.historyLimited" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-glow/40 bg-brand-glow/10 px-4 py-3 text-sm">
+        <span>Showing the last 30 days. Older clicks are kept and appear when you upgrade.</span>
+        <a zButton routerLink="/app/billing" size="sm">Upgrade for full history</a>
+      </div>
+
+      <!-- Tiles -->
+      <div class="mt-6 grid gap-4 sm:grid-cols-3">
+        <z-stat-tile [label]="(includeBots$ | async) ? 'Clicks (incl. bots)' : 'Clicks'" [value]="s.total | number"></z-stat-tile>
+        <z-stat-tile label="Unique visitors" [value]="s.uniqueVisitors | number"></z-stat-tile>
+        <z-stat-tile label="Bot clicks" [value]="s.botClicks | number" hint="Crawlers and link previews"></z-stat-tile>
+      </div>
+
+      <ng-container *ngIf="s.total > 0; else noClicks">
+        <z-card class="mt-4">
+          <h2 class="text-base font-semibold">Clicks per day <span class="text-sm font-normal text-muted">(UTC)</span></h2>
+          <app-clicks-chart class="mt-4" [days]="s.clicksPerDay"></app-clicks-chart>
+        </z-card>
+
+        <!-- A/B split -->
+        <z-card *ngIf="s.variants as variants" class="mt-4">
+          <h2 class="text-base font-semibold">A/B destinations</h2>
+          <ul class="mt-3 space-y-3">
+            <li *ngFor="let v of variants; let i = index" class="text-sm">
+              <div class="flex items-baseline justify-between gap-3">
+                <span class="min-w-0 truncate"><span class="mr-2 font-semibold text-muted">{{ 'ABCDE'[i] }}</span>{{ v.url }}</span>
+                <span class="shrink-0 tabular-nums text-muted">{{ v.clicks | number }} · {{ variantShare(v.clicks, variants) }}%</span>
+              </div>
+              <div class="mt-1 h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+                <div class="h-full rounded-full bg-brand" [style.width.%]="variantShare(v.clicks, variants)"></div>
+              </div>
+            </li>
+          </ul>
+        </z-card>
+
+        <!-- Breakdowns -->
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <app-breakdown-card title="Referrers" [items]="s.referrers" [total]="s.total"></app-breakdown-card>
+          <app-breakdown-card title="Browsers" [items]="s.browsers" [total]="s.total"></app-breakdown-card>
+          <app-breakdown-card title="Operating systems" [items]="s.operatingSystems" [total]="s.total"></app-breakdown-card>
+          <app-breakdown-card title="Devices" [items]="s.devices" [total]="s.total"></app-breakdown-card>
+        </div>
+
+        <!-- Locations (Pro) -->
+        <section class="mt-4" aria-labelledby="locations-title">
+          <ng-container *ngIf="s.countries && s.cities; else lockedGeo">
+            <z-card>
+              <h2 id="locations-title" class="text-base font-semibold">Where visitors are</h2>
+              <app-world-map class="mt-4" [countries]="s.countries"></app-world-map>
+            </z-card>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+              <app-breakdown-card title="Countries" [items]="s.countries" [total]="s.total" [label]="countryName"></app-breakdown-card>
+              <app-breakdown-card title="Cities" [items]="s.cities" [total]="s.total" [label]="cityLabel"></app-breakdown-card>
+            </div>
+          </ng-container>
+          <ng-template #lockedGeo>
+            <z-card class="relative overflow-hidden">
+              <h2 id="locations-title" class="flex items-center gap-2 text-base font-semibold">Where visitors are <z-badge tone="pro" [locked]="true">Pro</z-badge></h2>
+              <!-- Decorative blurred preview; no real data is shown to Free accounts. -->
+              <div class="mt-4 grid select-none gap-2 blur-sm" aria-hidden="true">
+                <div *ngFor="let w of [78, 54, 36, 22]" class="h-3 rounded-full bg-brand opacity-40" [style.width.%]="w"></div>
+              </div>
+              <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface/60 p-6 text-center backdrop-blur-[2px]">
+                <p class="text-sm">Country and city breakdowns, plus a world map, come with Pro.</p>
+                <button zButton size="sm" (click)="askUpgrade('Country and city analytics are part of Zelqit Pro.')">Unlock locations</button>
+              </div>
+            </z-card>
+          </ng-template>
+        </section>
+      </ng-container>
+
+      <ng-template #noClicks>
+        <z-card class="mt-4 py-10 text-center">
+          <h2 class="text-lg font-semibold">No clicks yet</h2>
+          <p class="mt-1 text-sm text-muted">Share {{ shortUrl(s.link.code) }} and the numbers will appear here.</p>
+        </z-card>
+      </ng-template>
+    </ng-container>
+  </ng-container>
+</ng-container>
